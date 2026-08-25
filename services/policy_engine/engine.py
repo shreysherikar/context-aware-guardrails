@@ -1,0 +1,107 @@
+"""
+Policy engine (policy plane — deterministic).
+
+This is the only module allowed to produce a PolicyDecision. It reads
+version-controlled rules from policies/policy.yaml, validates them up front
+(see policy_models.py) and does pure rule lookup — no LLM call happens here,
+ever. On any error (unmatched risk profile, unexpected evaluation failure) it
+fails CLOSED to BLOCK, never open to ALLOW.
+
+The policy path comes from the POLICY_PATH environment variable, falling back
+to the repository default, so the deployed configuration is explicit rather
+than hardcoded.
+"""
+
+import logging
+import os
+from pathlib import Path
+
+import yaml
+
+from domain.enums import PolicyAction
+from domain.models import PolicyDecision, RiskAssessment
+from services.policy_engine.policy_models import (
+    PolicyFile,
+    PolicyRule,
+    PolicyValidationError,
+)
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[2] / "policies" / "policy.yaml"
+
+
+class PolicyEngine:
+    def __init__(self, policy_path: Path | None = None):
+        self.policy_path = policy_path or Path(os.getenv("POLICY_PATH", str(DEFAULT_POLICY_PATH)))
+        self._policy: PolicyFile = self._load_policy()
+
+    def _load_policy(self) -> PolicyFile:
+        try:
+            with open(self.policy_path) as f:
+                raw = yaml.safe_load(f)
+        except FileNotFoundError as exc:
+            raise PolicyValidationError(f"Policy file not found: {self.policy_path}") from exc
+        except yaml.YAMLError as exc:
+            raise PolicyValidationError(f"Policy file is malformed YAML: {exc}") from exc
+
+        try:
+            return PolicyFile.model_validate(raw)
+        except Exception as exc:  # noqa: BLE001 - pydantic errors are the expected failure mode
+            raise PolicyValidationError(
+                f"Policy file is invalid ({self.policy_path}): {exc}"
+            ) from exc
+
+    def reload(self) -> None:
+        self._policy = self._load_policy()
+
+    def evaluate(self, risk: RiskAssessment, user_role: str) -> PolicyDecision:
+        version = self._policy.version
+        try:
+            for rule in self._policy.rules:
+                if self._rule_matches(rule, risk, user_role):
+                    return PolicyDecision(
+                        action=rule.action,
+                        policy_id=rule.id,
+                        policy_version=version,
+                        reasons=[rule.description or rule.id],
+                        required_controls=rule.required_controls,
+                    )
+            # No rule matched this risk profile at all -> fail closed.
+            return PolicyDecision(
+                action=PolicyAction.BLOCK,
+                policy_id="DEFAULT-FAIL-CLOSED",
+                policy_version=version,
+                reasons=["No policy rule matched this risk profile; defaulting to BLOCK."],
+            )
+        except Exception:  # noqa: BLE001 - fail closed on ANY evaluation error
+            logger.exception("Unexpected policy evaluation error; failing closed to BLOCK")
+            return PolicyDecision(
+                action=PolicyAction.BLOCK,
+                policy_id="ERROR-FAIL-CLOSED",
+                policy_version=version,
+                reasons=["Unexpected policy evaluation error; defaulting to BLOCK."],
+            )
+
+    @staticmethod
+    def _rule_matches(rule: PolicyRule, risk: RiskAssessment, user_role: str) -> bool:
+        if rule.risk_level is not None and rule.risk_level != risk.risk_level:
+            return False
+        if rule.category is not None and rule.category not in risk.categories:
+            return False
+        # Disguise and injection are separate signals: either can be present
+        # without the other, so each has its own condition.
+        if rule.disguise_detected is not None and rule.disguise_detected != risk.disguise_detected:
+            return False
+        if (
+            rule.injection_detected is not None
+            and rule.injection_detected != risk.injection_detected
+        ):
+            return False
+        if rule.sensitivity is not None and rule.sensitivity != risk.data_sensitivity:
+            return False
+        if user_role in rule.exclude_roles:
+            return False
+        if rule.require_roles and user_role not in rule.require_roles:
+            return False
+        return True

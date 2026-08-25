@@ -1,0 +1,25 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+
+  # Optional: uncomment when the production/security layer needs a real
+  # database instead of the SQLite audit log.
+  # postgres:
+  #   image: postgres:16
+  #   environment:
+  #     POSTGRES_USER: guardrail
+  #     POSTGRES_PASSWORD: guardrail
+  #     POSTGRES_DB: guardrail
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+
+# volumes:
+#   pgdata:

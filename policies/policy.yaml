@@ -1,0 +1,40 @@
+version: "0.1.0"
+
+# Rules are evaluated top to bottom; the first match wins.
+# Order matters: put the most severe / specific rules first.
+rules:
+  - id: INJECTION-001
+    description: "Disguise or prompt injection detected — block outright."
+    disguise_detected: true
+    action: BLOCK
+
+  - id: INJECTION-002
+    description: "Direct prompt injection detected — block outright."
+    injection_detected: true
+    action: BLOCK
+
+  - id: PHI-001
+    description: "Patient-identifiable data requested — route to human review."
+    category: PHI
+    sensitivity: PATIENT_IDENTIFIABLE
+    action: REVIEW
+
+  - id: PII-001
+    description: "PII detected — offer a safer rewritten form of the request."
+    category: PII
+    action: REWRITE
+
+  - id: OFFLABEL-001
+    description: "Possible off-label / unapproved-use content — request clarification."
+    category: OFF_LABEL
+    action: CLARIFY
+
+  - id: IP-001
+    description: "Potential intellectual property exposure — route to human review."
+    category: IP
+    action: REVIEW
+
+  - id: LOW-001
+    description: "No meaningful risk detected — allow through."
+    risk_level: LOW
+    action: ALLOW

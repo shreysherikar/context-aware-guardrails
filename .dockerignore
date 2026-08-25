@@ -1,0 +1,16 @@
+.venv/
+.git/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secrets and local data must never enter an image.
+.env
+audit.db
+
+# Documentation and notes are not needed at runtime.
+docs/
+*.md
