@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from domain.enums import DataSensitivity, PolicyAction, RiskCategory, RiskLevel
-from domain.models import RiskAssessment
+from domain.models import RiskAssessment, TrajectoryAssessment
 from services.policy_engine.engine import PolicyEngine
 from services.policy_engine.policy_models import PolicyValidationError
 
@@ -183,3 +183,61 @@ def test_precedence_most_specific_rule_wins(tmp_path):
     )
     engine_b = PolicyEngine(policy_path=reversed_yaml)
     assert engine_b.evaluate(risk, "researcher").policy_id == "CATCH-ALL-BLOCK"
+
+
+# --- trajectory condition -----------------------------------------------------
+
+
+def _trajectory_risk() -> RiskAssessment:
+    """An individually-ALLOW-able risk profile (LOW / NONE)."""
+    return RiskAssessment(risk_level=RiskLevel.LOW, categories=[RiskCategory.NONE])
+
+
+def test_trajectory_escalation_routes_low_turn_to_review():
+    risk = _trajectory_risk()
+    trajectory = TrajectoryAssessment(escalate=True, reason="repeated PII probe")
+    decision = engine.evaluate(risk, "researcher", trajectory=trajectory)
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "TRAJECTORY-001"
+
+
+def test_no_escalation_keeps_single_turn_behavior():
+    risk = _trajectory_risk()
+    trajectory = TrajectoryAssessment(escalate=False, reason="no pattern")
+    decision = engine.evaluate(risk, "researcher", trajectory=trajectory)
+    assert decision.action == PolicyAction.ALLOW
+    assert decision.policy_id == "LOW-001"
+
+
+def test_missing_trajectory_skips_trajectory_rule():
+    """Existing single-turn callers (no trajectory) must be unaffected."""
+    risk = _trajectory_risk()
+    decision = engine.evaluate(risk, "researcher")
+    assert decision.action == PolicyAction.ALLOW
+    assert decision.policy_id == "LOW-001"
+
+
+def test_direct_block_rules_take_priority_over_escalation():
+    """A direct-match BLOCK rule on this turn wins regardless of history."""
+    risk = RiskAssessment(
+        risk_level=RiskLevel.CRITICAL,
+        categories=[RiskCategory.PROMPT_INJECTION],
+        injection_detected=True,
+    )
+    trajectory = TrajectoryAssessment(escalate=True, reason="prior probing")
+    decision = engine.evaluate(risk, "researcher", trajectory=trajectory)
+    assert decision.action == PolicyAction.BLOCK
+    assert decision.policy_id == "INJECTION-002"
+
+
+def test_direct_review_rules_take_priority_over_escalation():
+    """PHI-001 (direct REVIEW) still matches first even when escalation is set."""
+    risk = RiskAssessment(
+        risk_level=RiskLevel.HIGH,
+        categories=[RiskCategory.PHI],
+        data_sensitivity=DataSensitivity.PATIENT_IDENTIFIABLE,
+    )
+    trajectory = TrajectoryAssessment(escalate=True, reason="prior probing")
+    decision = engine.evaluate(risk, "researcher", trajectory=trajectory)
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "PHI-001"

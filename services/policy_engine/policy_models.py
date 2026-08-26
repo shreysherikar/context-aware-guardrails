@@ -25,6 +25,10 @@ class PolicyRule(BaseModel):
     disguise_detected: bool | None = None
     injection_detected: bool | None = None
     sensitivity: DataSensitivity | None = None
+    # When set, the rule only matches if the conversation trajectory assessment
+    # (if any) has this escalate value. Evidence only — the trajectory engine
+    # never produces a PolicyDecision.
+    trajectory_escalate: bool | None = None
     # Empty = match any input type (text and image). Non-empty = only match when
     # PolicyEngine.evaluate(..., input_type=...) is one of these values.
     input_types: list[str] = Field(default_factory=list)

@@ -5,12 +5,7 @@ from domain.models import OpticalFinding
 from services.sanitization.engine import SanitizationEngine
 from services.sanitization.models import SanitizationRequest
 
-OCR = (
-    "Patient: John Smith\n"
-    "DOB: 12/03/1984\n"
-    "MRN: 837291\n"
-    "HbA1c: 8.2%\n"
-)
+OCR = "Patient: John Smith\nDOB: 12/03/1984\nMRN: 837291\nHbA1c: 8.2%\n"
 
 
 def test_optical_rewrite_safe_context_excludes_original_ocr_identifiers():

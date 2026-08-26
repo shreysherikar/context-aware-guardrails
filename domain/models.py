@@ -45,6 +45,22 @@ class RiskAssessment(BaseModel):
     reasoning: str = ""
 
 
+class TrajectoryAssessment(BaseModel):
+    """Deterministic evidence about a conversation's risk trajectory.
+
+    Produced by services/trajectory_engine over stored audit history. This is
+    evidence only: it carries no PolicyAction, no policy_id, and no method that
+    could be mistaken for a decision. The PolicyEngine consumes `escalate` as
+    one condition among others and remains the sole producer of PolicyDecision.
+    """
+
+    escalate: bool = False
+    reason: str = ""
+    medium_or_above_count: int = 0
+    repeated_category: RiskCategory | None = None
+    non_decreasing_trend: bool = False
+
+
 class PolicyDecision(BaseModel):
     """Deterministic, auditable output of the policy plane. This is authority."""
 

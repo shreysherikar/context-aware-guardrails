@@ -4,6 +4,7 @@ version: "0.1.0"
 # Order matters: put the most severe / specific rules first.
 # Rules with input_types only apply to that intake path (e.g. image).
 rules:
+  # ── Direct-match BLOCK / REVIEW rules: take priority regardless of history. ──
   - id: INJECTION-001
     description: "Disguise or prompt injection detected — block outright."
     disguise_detected: true
@@ -39,6 +40,23 @@ rules:
     sensitivity: PATIENT_IDENTIFIABLE
     action: REVIEW
 
+  - id: IP-001
+    description: "Potential intellectual property exposure — route to human review."
+    category: IP
+    action: REVIEW
+
+  # ── Conversation-level trajectory (evidence from services/trajectory_engine). ──
+  # Placement contract: BELOW every direct-match BLOCK/REVIEW rule above (a hard
+  # match on THIS turn wins regardless of history), and ABOVE the softer
+  # single-turn friction rules that follow (PII-001 REWRITE, OFFLABEL-001
+  # CLARIFY, LOW-001 ALLOW) so an escalating conversation routes to human review
+  # even when this turn alone would resolve to rewrite/clarify/allow.
+  - id: TRAJECTORY-001
+    description: "Repeated sensitive-category probing or a non-decreasing risk trajectory across turns in this conversation — route to human review even though this turn alone would not."
+    trajectory_escalate: true
+    action: REVIEW
+
+  # ── Softer single-turn friction: first-line REWRITE / CLARIFY responses. ──
   - id: PII-001
     description: "PII detected — offer a safer rewritten form of the request."
     category: PII
@@ -48,11 +66,6 @@ rules:
     description: "Possible off-label / unapproved-use content — request clarification."
     category: OFF_LABEL
     action: CLARIFY
-
-  - id: IP-001
-    description: "Potential intellectual property exposure — route to human review."
-    category: IP
-    action: REVIEW
 
   - id: LOW-001
     description: "No meaningful risk detected — allow through."

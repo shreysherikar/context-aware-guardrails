@@ -63,6 +63,7 @@ from services.policy_engine.engine import PolicyEngine  # noqa: E402
 from services.risk_engine.factory import get_classifier  # noqa: E402
 from services.sanitization.factory import get_sanitization_engine  # noqa: E402
 from services.sanitization.models import SanitizationRequest, SanitizationResult  # noqa: E402
+from services.trajectory_engine.engine import evaluate_conversation  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -229,14 +230,14 @@ def _generation_response(
         )
 
     if output_result.flagged:
-        body = {
+        flagged_body: dict[str, object] = {
             "decision": decision,
             "risk_assessment": risk,
             **_flagged_for_review_response(),
         }
         if extra:
-            body.update(extra)
-        return body
+            flagged_body.update(extra)
+        return flagged_body
 
     body: dict[str, object] = {
         "decision": decision,
@@ -297,7 +298,8 @@ async def evaluate(
     verified_role: str = Depends(get_verified_role),
 ):
     risk = classifier.classify(request)
-    decision = policy_engine.evaluate(risk, verified_role)
+    trajectory = evaluate_conversation(request.conversation_id, risk)
+    decision = policy_engine.evaluate(risk, verified_role, trajectory=trajectory)
 
     # BLOCK / REVIEW / CLARIFY (and any non-ALLOW/REWRITE): stop — no LLM.
     if decision.action not in (PolicyAction.ALLOW, PolicyAction.REWRITE):
@@ -415,7 +417,10 @@ async def evaluate_image(
 
     optical: OpticalAssessment = optical_analyzer.analyze(ocr_result, image=validated.data)
     risk = normalize_optical_assessment(optical)
-    decision = policy_engine.evaluate(risk, verified_role, input_type="image")
+    trajectory = evaluate_conversation(conversation_id, risk)
+    decision = policy_engine.evaluate(
+        risk, verified_role, input_type="image", trajectory=trajectory
+    )
 
     optical_meta = OpticalAuditMeta(
         input_type="image",

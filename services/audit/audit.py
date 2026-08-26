@@ -10,9 +10,18 @@ is built without touching callers — they only ever call log_event().
 
 import os
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
-from domain.models import AuditEvent
+from domain.models import (
+    AuditEvent,
+    LLMResult,
+    OpticalAuditMeta,
+    OutputGuardrailResult,
+    PolicyDecision,
+    RiskAssessment,
+    SanitizationAuditMeta,
+)
 
 DB_PATH = Path(__file__).resolve().parents[2] / "audit.db"
 
@@ -94,3 +103,65 @@ def log_event(event: AuditEvent) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def _row_to_audit_event(row: tuple) -> AuditEvent:
+    """Deserialize one audit_log row into an AuditEvent (restoring domain types)."""
+    (
+        conversation_id,
+        prompt,
+        user_role,
+        risk_assessment_json,
+        policy_decision_json,
+        llm_json,
+        output_guardrail_json,
+        optical_json,
+        sanitization_json,
+        timestamp,
+    ) = row
+    return AuditEvent(
+        conversation_id=conversation_id,
+        prompt=prompt,
+        user_role=user_role,
+        risk_assessment=RiskAssessment.model_validate_json(risk_assessment_json),
+        policy_decision=PolicyDecision.model_validate_json(policy_decision_json),
+        llm=LLMResult.model_validate_json(llm_json) if llm_json else None,
+        output_guardrail=OutputGuardrailResult.model_validate_json(output_guardrail_json)
+        if output_guardrail_json
+        else None,
+        optical=OpticalAuditMeta.model_validate_json(optical_json) if optical_json else None,
+        sanitization=SanitizationAuditMeta.model_validate_json(sanitization_json)
+        if sanitization_json
+        else None,
+        timestamp=datetime.fromisoformat(timestamp),
+    )
+
+
+def get_recent_events(conversation_id: str, limit: int = 10) -> list[AuditEvent]:
+    """Return the MOST RECENT ``limit`` prior audit events, oldest first.
+
+    Used by the trajectory engine: a long conversation must be scored on its
+    latest turns, so the query selects the newest ``limit`` rows (descending)
+    and they are returned in chronological order (oldest -> newest) so trend
+    calculation sees time-ordered turns. Only prior turns are returned: for a
+    live request the current turn's event is written by log_event() AFTER the
+    policy decision is made, so at the point trajectory evaluation runs the
+    current turn has not been persisted and this query structurally cannot
+    include it.
+    """
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT conversation_id, prompt, user_role, risk_assessment,
+               policy_decision, llm, output_guardrail, optical, sanitization,
+               timestamp
+               FROM audit_log
+               WHERE conversation_id = ?
+               ORDER BY id DESC
+               LIMIT ?""",
+            (conversation_id, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    # SQL returns newest-first; hand callers chronological order.
+    return [_row_to_audit_event(row) for row in reversed(rows)]

@@ -224,13 +224,46 @@ Lightweight ADR-style record. `DECIDED` = reflected in this repository today.
 
 ### Conversation context store & risk-trajectory tracking
 
-- Status: OPEN
-- Question: how is conversation history and cumulative session risk stored and
-  fed into classification?
-- Options under consideration: none (single-turn only today); in-process
-  store; external session store.
+Status: PARTIALLY DECIDED
+
+Decided — deterministic trajectory escalation (implemented):
+
+- Context: individually low-risk turns in one conversation can add up to a
+  targeted probing attempt that single-turn evaluation cannot see.
+- Options considered: LLM-based session analysis; heuristic drift scores;
+  deterministic counting over stored history.
+- Chosen option: deterministic counting/pattern-matching in
+  `services/trajectory_engine` — MEDIUM+ turn count, repetition of the same
+  non-`NONE` risk category across turns, and a strictly defined non-decreasing
+  risk-level trend — computed over prior audit events for the conversation
+  plus the current turn's RiskAssessment (each counted exactly once).
+- Why: fully reproducible, cheap, testable without any model; consistent with
+  the rule that classifiers produce evidence and only the policy engine decides.
+- Consequences: history comes from the existing audit log via
+  `get_recent_events(conversation_id)` — no second state store; window size is
+  bounded by the configured turn limit.
+
+Decided — trajectory behaves fail-open when history lookup fails:
+
+- Decision: if reading prior events fails (e.g. database unavailable),
+  trajectory evaluation proceeds using ONLY the current turn's assessment,
+  with a logged warning. It does not force REVIEW.
+- Why: single-turn enforcement remains fail-closed and is the primary safety
+  net; losing historical context should degrade gracefully rather than flood
+  human review with false escalations during a storage outage. Every request
+  is still audited either way.
+- Consequences: an audit-log outage silently reduces multi-turn visibility;
+  monitoring should alert on the warning. This is deliberate and documented,
+  not a silent default.
+
+Still open (context store beyond the audit log):
+
+- Question: does multi-conversation/session analysis eventually need more than
+  the existing SQLite audit log?
+- Options under consideration: keep audit log as sole source; dedicated
+  session/context store.
 - What needs to be evaluated: privacy of retained history, storage choice,
-  trajectory-scoring approach.
+  richer trajectory signals.
 
 ### Extended detection capabilities
 
