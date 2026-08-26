@@ -141,3 +141,59 @@ def test_older_schema_missing_llm_column_migrates_both_columns(monkeypatch, tmp_
     columns = _columns(target)
     assert "llm" in columns
     assert "output_guardrail" in columns
+    assert "optical" in columns
+
+
+def test_pre_optical_schema_is_migrated(monkeypatch, tmp_path):
+    """Schema with llm + output_guardrail but without optical still migrates."""
+    target = tmp_path / "pre_optical.db"
+    conn = sqlite3.connect(target)
+    conn.execute(
+        """
+        CREATE TABLE audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+            user_role TEXT NOT NULL,
+            risk_assessment TEXT NOT NULL,
+            policy_decision TEXT NOT NULL,
+            llm TEXT,
+            output_guardrail TEXT,
+            timestamp TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+    assert "optical" not in _columns(target)
+
+    monkeypatch.setenv("AUDIT_DB_PATH", str(target))
+    from domain.models import OpticalAuditMeta
+
+    log_event(
+        AuditEvent(
+            conversation_id="mig-opt",
+            prompt="[image input]",
+            user_role="researcher",
+            risk_assessment=RiskAssessment(risk_level=RiskLevel.LOW),
+            policy_decision=PolicyDecision(
+                action=PolicyAction.ALLOW, policy_id="LOW-001", policy_version="0.1.0"
+            ),
+            optical=OpticalAuditMeta(
+                input_type="image",
+                ocr_used=True,
+                optical_analysis_used=True,
+                finding_count=0,
+                image_sha256="abc",
+            ),
+        )
+    )
+
+    assert "optical" in _columns(target)
+    check = sqlite3.connect(target)
+    try:
+        row = check.execute("SELECT optical FROM audit_log").fetchone()
+        assert json.loads(row[0])["input_type"] == "image"
+        assert json.loads(row[0])["image_sha256"] == "abc"
+    finally:
+        check.close()

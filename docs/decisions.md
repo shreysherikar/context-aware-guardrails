@@ -91,19 +91,19 @@ Lightweight ADR-style record. `DECIDED` = reflected in this repository today.
   policy explicit.
 - Consequences: classifiers and policies must handle both fields.
 
-### 10. Generative LLM runs only after a policy ALLOW
+### 10. Generative LLM runs only after policy permits generation
 
-- Status: DECIDED
+- Status: DECIDED (amended by decisions 12–13)
 - Context: the generative model must never see blocked or held requests, and
   must never influence whether a request is allowed.
 - Decision: the API calls the LLM gateway only when `PolicyEngine` returns
-  ALLOW. BLOCK and REVIEW (and any other non-ALLOW action) return structured
-  stop responses without any model call; LLM failures on ALLOWed requests
-  produce a safe error, never a fabricated success.
+  ALLOW, or REWRITE after successful sanitization. BLOCK and REVIEW return
+  structured stop responses without any model call; LLM failures on permitted
+  requests produce a safe error, never a fabricated success.
 - Reason: keeps the deterministic policy engine fully authoritative over what
   reaches an LLM (input guardrail before the call).
 - Consequences: any new pipeline stage that touches an LLM must sit behind the
-  same ALLOW check; covered by dedicated flow tests.
+  same policy gate; covered by dedicated flow tests.
 
 ### 11. Generation provider is configured independently behind a small gateway
 
@@ -119,6 +119,33 @@ Lightweight ADR-style record. `DECIDED` = reflected in this repository today.
 - Consequences: the offline default produces ALLOW responses with a null
   generated-text field; the synchronous Groq client inside the async method is
   acceptable for now, with an async client deferred until needed.
+
+### 12. Optical REWRITE sanitizes before generation (image path only)
+
+- Status: SUPERSEDED by decision 13
+- Context: P0 optical intake supported REWRITE as sanitization of OCR text
+  before generation; text REWRITE remained a terminal stop.
+- Decision: superseded — both text and image REWRITE now use unified
+  sanitization (decision 13).
+
+### 13. Unified sanitization for REWRITE (text and image)
+
+- Status: DECIDED
+- Context: REWRITE must mean "transform the request into a policy-compliant
+  representation before LLM generation" for both text and image/OCR inputs.
+  The LLM must never receive the original sensitive context after REWRITE.
+- Decision: a provider-independent `SanitizationEngine` in
+  `services/sanitization/` produces sanitized text from either source. On
+  policy REWRITE (text or image), the API sanitizes first, then may call the
+  LLM with only the sanitized prompt. Sanitization failure fails closed to
+  REVIEW — never falls back to the original content, and never silently
+  upgrades REWRITE to ALLOW. ALLOW does not invoke the sanitizer. BLOCK and
+  REVIEW still never reach the LLM. PolicyEngine remains the sole authority.
+- Reason: one safe-context plane for both intake paths; preserves fail-closed
+  security invariants.
+- Consequences: FakeGateway tests assert original identifiers are absent from
+  the LLM prompt after REWRITE; sanitizer exception tests assert REVIEW and
+  zero LLM calls.
 
 ## Open decisions
 
@@ -207,11 +234,11 @@ Lightweight ADR-style record. `DECIDED` = reflected in this repository today.
 
 ### Extended detection capabilities
 
-- Status: OPEN
+- Status: OPEN (partially addressed by P0 optical intake)
 - Question: when do multi-modal intake, behavioural drift detection, and the
   policy-learning loop get built?
-- Options under consideration: not started; sequenced after the output
-  guardrail.
+- Options under consideration: optical OCR intake is implemented (P0); facial
+  recognition, medical image interpretation, and policy learning remain later.
 - What needs to be evaluated: value vs effort for each, data requirements,
   false-positive impact.
 

@@ -25,6 +25,9 @@ class PolicyRule(BaseModel):
     disguise_detected: bool | None = None
     injection_detected: bool | None = None
     sensitivity: DataSensitivity | None = None
+    # Empty = match any input type (text and image). Non-empty = only match when
+    # PolicyEngine.evaluate(..., input_type=...) is one of these values.
+    input_types: list[str] = Field(default_factory=list)
     exclude_roles: list[str] = Field(default_factory=list)
     require_roles: list[str] = Field(default_factory=list)
     required_controls: list[str] = Field(default_factory=list)

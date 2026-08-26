@@ -55,11 +55,16 @@ class PolicyEngine:
     def reload(self) -> None:
         self._policy = self._load_policy()
 
-    def evaluate(self, risk: RiskAssessment, user_role: str) -> PolicyDecision:
+    def evaluate(
+        self,
+        risk: RiskAssessment,
+        user_role: str,
+        input_type: str | None = None,
+    ) -> PolicyDecision:
         version = self._policy.version
         try:
             for rule in self._policy.rules:
-                if self._rule_matches(rule, risk, user_role):
+                if self._rule_matches(rule, risk, user_role, input_type):
                     return PolicyDecision(
                         action=rule.action,
                         policy_id=rule.id,
@@ -84,7 +89,17 @@ class PolicyEngine:
             )
 
     @staticmethod
-    def _rule_matches(rule: PolicyRule, risk: RiskAssessment, user_role: str) -> bool:
+    def _rule_matches(
+        rule: PolicyRule,
+        risk: RiskAssessment,
+        user_role: str,
+        input_type: str | None = None,
+    ) -> bool:
+        # Rules with input_types only match when the caller supplies a matching
+        # input_type (e.g. "image"). Empty input_types = unrestricted (text + image).
+        if rule.input_types:
+            if input_type is None or input_type not in rule.input_types:
+                return False
         if rule.risk_level is not None and rule.risk_level != risk.risk_level:
             return False
         if rule.category is not None and rule.category not in risk.categories:

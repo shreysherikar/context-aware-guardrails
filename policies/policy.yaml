@@ -2,6 +2,7 @@ version: "0.1.0"
 
 # Rules are evaluated top to bottom; the first match wins.
 # Order matters: put the most severe / specific rules first.
+# Rules with input_types only apply to that intake path (e.g. image).
 rules:
   - id: INJECTION-001
     description: "Disguise or prompt injection detected — block outright."
@@ -12,6 +13,25 @@ rules:
     description: "Direct prompt injection detected — block outright."
     injection_detected: true
     action: BLOCK
+
+  - id: OPT-INJECTION-001
+    description: "Visual/OCR prompt injection detected — block."
+    input_types: [image]
+    injection_detected: true
+    action: BLOCK
+
+  - id: OPT-PII-REWRITE-001
+    description: "Identifiable data in image OCR — sanitize before any generation."
+    input_types: [image]
+    category: PII
+    action: REWRITE
+
+  - id: OPT-PHI-REVIEW-001
+    description: "High-risk clinical/PHI image content — human review."
+    input_types: [image]
+    category: PHI
+    sensitivity: PATIENT_IDENTIFIABLE
+    action: REVIEW
 
   - id: PHI-001
     description: "Patient-identifiable data requested — route to human review."

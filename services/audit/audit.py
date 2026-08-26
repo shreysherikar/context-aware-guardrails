@@ -24,6 +24,8 @@ DB_PATH = Path(__file__).resolve().parents[2] / "audit.db"
 _COLUMNS_TO_MIGRATE: list[tuple[str, str]] = [
     ("llm", "TEXT"),
     ("output_guardrail", "TEXT"),
+    ("optical", "TEXT"),
+    ("sanitization", "TEXT"),
 ]
 
 
@@ -57,6 +59,8 @@ def _get_conn() -> sqlite3.Connection:
             policy_decision TEXT NOT NULL,
             llm TEXT,
             output_guardrail TEXT,
+            optical TEXT,
+            sanitization TEXT,
             timestamp TEXT NOT NULL
         )
         """
@@ -71,8 +75,9 @@ def log_event(event: AuditEvent) -> None:
         conn.execute(
             """INSERT INTO audit_log
                (conversation_id, prompt, user_role, risk_assessment,
-                policy_decision, llm, output_guardrail, timestamp)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                policy_decision, llm, output_guardrail, optical, sanitization,
+                timestamp)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 event.conversation_id,
                 event.prompt,
@@ -81,6 +86,8 @@ def log_event(event: AuditEvent) -> None:
                 event.policy_decision.model_dump_json(),
                 event.llm.model_dump_json() if event.llm else None,
                 event.output_guardrail.model_dump_json() if event.output_guardrail else None,
+                event.optical.model_dump_json() if event.optical else None,
+                event.sanitization.model_dump_json() if event.sanitization else None,
                 event.timestamp.isoformat(),
             ),
         )

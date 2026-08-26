@@ -97,6 +97,73 @@ class OutputGuardrailResult(BaseModel):
     error_kind: str | None = None
 
 
+class OCREntity(BaseModel):
+    """A span extracted by OCR (evidence only — never a policy decision)."""
+
+    label: str
+    text: str
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    bbox: list[float] | None = None
+
+
+class OCRResult(BaseModel):
+    """Structured OCR output. Carries no ALLOW/BLOCK authority."""
+
+    text: str
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    entities: list[OCREntity] = Field(default_factory=list)
+
+
+class OpticalFinding(BaseModel):
+    """One optical-analysis finding. Evidence only — not a policy action."""
+
+    type: str
+    category: RiskCategory
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    text: str | None = None
+    bbox: list[float] | None = None
+
+
+class OpticalAssessment(BaseModel):
+    """Optical-plane assessment. Must never carry a final policy action.
+
+    Downstream code normalizes this into a RiskAssessment; only the
+    PolicyEngine may produce a PolicyDecision.
+    """
+
+    ocr_text: str
+    document_type: str | None = None
+    findings: list[OpticalFinding] = Field(default_factory=list)
+    face_detected: bool = False
+    injection_detected: bool = False
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
+class OpticalAuditMeta(BaseModel):
+    """Audit metadata for optical/image requests. No raw images or PHI OCR."""
+
+    input_type: str = "image"
+    ocr_used: bool = True
+    optical_analysis_used: bool = True
+    document_type: str | None = None
+    finding_count: int = 0
+    sanitization_applied: bool = False
+    image_sha256: str | None = None
+
+
+class SanitizationAuditMeta(BaseModel):
+    """Audit signals for REWRITE sanitization — no raw PHI values."""
+
+    attempted: bool = False
+    succeeded: bool = False
+    applied: bool = False
+    input_type: str = "text"
+    finding_count: int = 0
+    sanitizer_version: str = "1.0.0"
+    sanitized_context_used: bool = False
+    failure_kind: str | None = None
+
+
 class AuditEvent(BaseModel):
     conversation_id: str
     prompt: str
@@ -106,4 +173,6 @@ class AuditEvent(BaseModel):
     policy_decision: PolicyDecision
     llm: LLMResult | None = None
     output_guardrail: OutputGuardrailResult | None = None
+    optical: OpticalAuditMeta | None = None
+    sanitization: SanitizationAuditMeta | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

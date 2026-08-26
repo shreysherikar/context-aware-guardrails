@@ -27,3 +27,8 @@ def test_output_guardrail_provider_is_forced_off_in_test_process():
     # Empty string = no output guardrail wired. A real .env may set groq;
     # conftest must override that for tests (setdefault before app import).
     assert os.environ.get("OUTPUT_GUARDRAIL_PROVIDER", "").strip().lower() == ""
+
+
+def test_optical_ocr_provider_defaults_to_mock_in_test_process():
+    # Optical OCR must stay offline in CI; a local .env may set tesseract.
+    assert os.environ.get("OPTICAL_OCR_PROVIDER", "").strip().lower() == "mock"

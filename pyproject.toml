@@ -11,6 +11,13 @@ dependencies = [
     "groq>=0.18",
     "python-dotenv>=1.2.3",
     "pyjwt>=2.8",
+    "python-multipart>=0.0.9",
+    "pillow>=10.0",
+]
+
+[project.optional-dependencies]
+optical-tesseract = [
+    "pytesseract>=0.3.10",
 ]
 
 [build-system]

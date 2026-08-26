@@ -40,6 +40,10 @@ The relevant knobs:
   Groq provider is enabled.
 - `POLICY_PATH`, `AUDIT_DB_PATH` — override the policy file and audit database
   locations.
+- `OPTICAL_OCR_PROVIDER` — OCR for `POST /guardrail/evaluate-image`. Default
+  `mock` (offline). Set `tesseract` for local Tesseract (`uv sync --extra
+  optical-tesseract` plus a system Tesseract binary).
+- `OPTICAL_MAX_IMAGE_BYTES` — max upload size (default 10485760 = 10 MB).
 
 `LLM_PROVIDER=mock` is the safe default for getting the server up without
 credentials.
@@ -49,17 +53,19 @@ credentials.
     uv run uvicorn apps.api.main:app --reload
 
 - `GET /health` — liveness check (`{"status":"ok"}`)
-- `POST /guardrail/evaluate` — the main evaluation endpoint
+- `POST /guardrail/evaluate` — text evaluation endpoint
 
   Body:
 
       {
         "prompt": "...",
-        "user_role": "researcher",
         "conversation_id": "abc"
       }
 
-  (`conversation_id` and `user_role` are required; `requested_action` optional)
+  (`conversation_id` required; role comes from the JWT, not the body)
+
+- `POST /guardrail/evaluate-image` — multipart optical evaluation (`image` file
+  + `conversation_id` form field). Same JWT auth as the text endpoint.
 
 Interactive docs: `http://localhost:8000/docs`. Docker alternative:
 `docker compose up --build` (mounts the repo and passes `.env` in).
@@ -102,6 +108,10 @@ from a shell that does not export these variables.
   decision field.
 - **New generation provider**: implement `services/llm/gateway.py:LLMGateway`
   and register it in `services/llm/factory.py` behind `LLM_GENERATION_PROVIDER`.
+- **REWRITE / sanitization**: `services/sanitization/` — unified text + optical
+  safe-context production. REWRITE means transform into a policy-compliant
+  representation before LLM generation. Do not put redaction rules in
+  `apps/api/main.py`.
 - **Not here**: `apps/api/main.py` is wiring-only and must not contain business
   or policy logic — routing rules live in `policies/` and decisions in
   `services/policy_engine/`. See the layering table in `architecture.md`.
