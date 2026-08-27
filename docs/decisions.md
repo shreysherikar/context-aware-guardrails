@@ -147,6 +147,56 @@ Lightweight ADR-style record. `DECIDED` = reflected in this repository today.
   the LLM prompt after REWRITE; sanitizer exception tests assert REVIEW and
   zero LLM calls.
 
+### 14. Evidence rule (EVIDENCE-001) gated by minimum risk level
+
+- Status: SUPERSEDED
+- Context: unsupported claims were initially gated by input risk level, with
+  low-risk requests allowed to fall through when evidence verification found
+  an unsupported generated claim.
+- Decision: EVIDENCE-001 was originally decided to trigger only on MEDIUM+ risk
+  turns, using `min_risk_level: MEDIUM`. That decision has been reverted;
+  EVIDENCE-001 now triggers on any unsupported claim assessment, regardless of
+  the input risk level.
+- Reason: EVIDENCE-001 is a post-generation, output-side check. A low-risk
+  input can still produce a generated hallucination, so gating the rule on the
+  input's risk level was a category mismatch: input risk says nothing about
+  whether the generated output is supported by approved-source evidence.
+- Consequences: the `min_risk_level` field and comparator remain available as
+  general-purpose policy mechanisms, but EVIDENCE-001 does not use them.
+- Superseded by: this entry's own history, from the original DECIDED
+  risk-gating decision to its deliberate reversion after identifying the
+  input-risk/output-evidence category mismatch. The record is retained rather
+  than deleted so the rationale and change history remain auditable.
+
+### 15. Claim verification integration: scoped exception to file-boundary constraints
+
+- Status: DECIDED (Integration Pass completion)
+- Context: the initial claim-verification feature scope (Prompts 1-4) specified
+  that core changes must avoid `apps/api/main.py` and `services/audit/audit.py`.
+  The final integration pass (Prompt 5) required wiring the post-LLM
+  claim-verification stage into the existing generate/guard flow, making
+  controlled, minimal changes to these two files necessary and justified.
+- Decision: permit scoped modifications to `apps/api/main.py` and
+  `services/audit/audit.py` as an exception, with full documentation and
+  verification that no other files outside the original allowed set were
+  touched.
+- Changes made:
+  - `apps/api/main.py`: added claim-verification wiring in
+    `_generate_and_guard()` and `_generation_response()` to invoke
+    `claim_verifier.verify()` post-LLM and pass `ClaimEvidenceAssessment` to
+    `policy_engine.evaluate()` for EVIDENCE-001 routing.
+  - `services/audit/audit.py`: added one new `claim_verification` column to
+    the audit schema, following the existing `optical` and `sanitization`
+    pattern for all-outcomes auditability.
+  - No other files outside the original allowed list were modified.
+- Reason: claim verification is a deterministic post-generation pipeline
+  stage; its integration with the policy engine cannot be isolated without
+  violating the "every decision is audited" principle or complicating the
+  already-tested generate/guard flow.
+- Consequences: maintain consistency with the "one place changes happen"
+  principle while enabling end-to-end claim verification and evidence-based
+  escalation to human review.
+
 ## Open decisions
 
 ### Guardrail framework
@@ -243,18 +293,22 @@ Decided — deterministic trajectory escalation (implemented):
   `get_recent_events(conversation_id)` — no second state store; window size is
   bounded by the configured turn limit.
 
-Decided — trajectory behaves fail-open when history lookup fails:
+Decided — trajectory behaves fail-closed when history lookup fails:
 
 - Decision: if reading prior events fails (e.g. database unavailable),
-  trajectory evaluation proceeds using ONLY the current turn's assessment,
-  with a logged warning. It does not force REVIEW.
+  trajectory evaluation escalates to REVIEW rather than silently degrading to
+  single-turn policy only. This ensures the fail-closed principle applies
+  across all authoritative gates.
 - Why: single-turn enforcement remains fail-closed and is the primary safety
-  net; losing historical context should degrade gracefully rather than flood
-  human review with false escalations during a storage outage. Every request
-  is still audited either way.
-- Consequences: an audit-log outage silently reduces multi-turn visibility;
-  monitoring should alert on the warning. This is deliberate and documented,
-  not a silent default.
+  net, but losing historical context must not grant a silent bypass. Failing
+  closed to REVIEW ensures that an audit-log outage does not reduce
+  multi-turn visibility in a way that allows requests through unchecked.
+- Consequences: an audit-log outage may increase human review load, but never
+  lets a potentially dangerous pattern slip through. The reason string in the
+  `TrajectoryAssessment` identifies this as a lookup failure (not a real
+  trajectory signal) so reviewers can distinguish it from genuine escalations.
+  This is deliberate and documented, not a silent default. Every request is
+  still audited either way.
 
 Still open (context store beyond the audit log):
 

@@ -137,3 +137,24 @@ def test_direct_block_rule_takes_priority_over_trajectory():
     body = resp.json()
     assert body["decision"]["action"] == "BLOCK"
     assert body["decision"]["policy_id"] == "INJECTION-001"
+
+
+def test_trajectory_history_lookup_failure_fails_closed(monkeypatch):
+    """When audit history lookup fails, trajectory escalates to REVIEW."""
+
+    def _boom(conversation_id: str, limit: int = 10):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr("services.trajectory_engine.engine.get_recent_events", _boom)
+    resp = client.post(
+        "/guardrail/evaluate",
+        json={"prompt": ALLOW_PROMPT, "conversation_id": "db-failure"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    # Even though this prompt alone resolves to ALLOW, the trajectory lookup
+    # failure escalates it to REVIEW via TRAJECTORY-001 (fail-closed behavior).
+    assert body["decision"]["action"] == "REVIEW"
+    assert body["decision"]["policy_id"] == "TRAJECTORY-001"
+    assert body["review_required"] is True

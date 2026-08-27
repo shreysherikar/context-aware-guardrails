@@ -230,7 +230,7 @@ below, is still planned):
 | Post-ALLOW response generation | **Implemented** (Groq gateway; final provider still open) |
 | Output guardrail (checks generated responses before they reach users; fail-closed to flagged-for-review) | **Implemented** — grounding is prompt-only (Groq) |
 | Bearer-token authentication (verified role, HS256, fail-closed startup) | **Implemented** — shared-secret interim mechanism, not full SSO/OIDC |
-| Claim/evidence verification against approved sources | **Planned** — approach open |
+| Claim/evidence verification against approved sources | **Implemented** (text + image, post-generation) — deterministic offline pipeline behind CLAIM_VERIFICATION_PROVIDER (default off): sentence-level claim extraction → lexical retrieval over the version-controlled trusted corpus → support/contradict assessment; the aggregate feeds the deterministic PolicyEngine's `claims_supported` condition (EVIDENCE-001 routes unsupported/contradicted/conflicting/insufficient claims to REVIEW); no LLM involved in verification |
 | RAG / retrieved-content protection (matching against approved sources) | **Planned** — approach open |
 | Conversation history & risk-trajectory tracking | **Implemented** — deterministic counting/pattern-matching over prior audit events per conversation (MEDIUM+ turns, repeated sensitive category, strictly-defined non-decreasing trend); evidence feeds the `trajectory_escalate` policy condition, never a decision; no LLM involved in scoring |
 | Role-aware policy conditions | **Partial** — rule fields exist and the role is now cryptographically verified; fine-grained role/permission model still open |

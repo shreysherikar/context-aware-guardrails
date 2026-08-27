@@ -1,0 +1,47 @@
+version: "1.0.0"
+# Trusted evidence corpus — approved-source material for claim/evidence
+# verification. Fictional placeholder compounds only; replace entries through
+# your own compliance review process. KEYS ARE CONTRACTS: version + sources
+# (source_id, title, text, optional lowercase topic keywords).
+sources:
+  - source_id: CCDS-GLYXTRA-V3
+    title: Company Core Data Sheet — GLYXTRA (extended release)
+    text: >
+      GLYXTRA extended release tablets are indicated once daily with food.
+      The maximum daily dose is 2000 mg. Dose adjustment is required in renal
+      impairment according to estimated glomerular filtration rate.
+    topics: [glyxtra, dose, dosing, renal, impairment, maximum, tablet]
+  - source_id: RMP-GLYXTRA-2026
+    title: Risk Management Plan Summary — GLYXTRA
+    text: >
+      Known warnings for GLYXTRA include gastrointestinal intolerance and
+      vitamin B12 deficiency after prolonged exposure. Liver enzymes should
+      be monitored during combination therapy.
+    topics: [glyxtra, warning, warnings, liver, vitamin, b12, monitoring]
+  - source_id: CCDS-VASCUTEN-V1
+    title: Company Core Data Sheet — VASCUTEN
+    text: >
+      VASCUTEN is indicated for prevention of stroke in atrial fibrillation.
+      Treatment must not be stopped abruptly before surgery. Epidural
+      catheter removal timing requires specialist consultation.
+    topics: [vascuten, stroke, atrial, fibrillation, surgery, prevention]
+  - source_id: CCDS-VASCUTEN-V2
+    title: Company Core Data Sheet Addendum — VASCUTEN warnings
+    text: >
+      Additional warnings: unexplained bruising reported postmarketing; no
+      dose adjustment needed in mild hepatic impairment.
+    topics: [vascuten, warning, bruising, hepatic, impairment]
+  - source_id: CTR-CS2024-118-SUMMARY
+    title: Clinical Trial Registry — Study CS-2024-118 results summary
+    text: >
+      In study CS-2024-118 the primary endpoint was met: symptom relief at
+      twelve weeks was statistically superior versus placebo. Efficacy in
+      patients aged under eighteen was not established.
+    topics: [trial, study, efficacy, endpoint, placebo, symptom, relief]
+  - source_id: MFG-IP-FACTSHEET-V4
+    title: Manufacturing — confidential formulation factsheet (internal)
+    text: >
+      The proprietary coating polymer composition and granulation parameters
+      are trade secrets. Distribution outside the manufacturing organization
+      is prohibited.
+    topics: [manufacturing, coating, polymer, proprietary, formulation]

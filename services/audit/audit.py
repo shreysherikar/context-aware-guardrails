@@ -15,6 +15,7 @@ from pathlib import Path
 
 from domain.models import (
     AuditEvent,
+    ClaimVerificationMeta,
     LLMResult,
     OpticalAuditMeta,
     OutputGuardrailResult,
@@ -35,6 +36,7 @@ _COLUMNS_TO_MIGRATE: list[tuple[str, str]] = [
     ("output_guardrail", "TEXT"),
     ("optical", "TEXT"),
     ("sanitization", "TEXT"),
+    ("claim_verification", "TEXT"),
 ]
 
 
@@ -70,6 +72,7 @@ def _get_conn() -> sqlite3.Connection:
             output_guardrail TEXT,
             optical TEXT,
             sanitization TEXT,
+            claim_verification TEXT,
             timestamp TEXT NOT NULL
         )
         """
@@ -85,8 +88,8 @@ def log_event(event: AuditEvent) -> None:
             """INSERT INTO audit_log
                (conversation_id, prompt, user_role, risk_assessment,
                 policy_decision, llm, output_guardrail, optical, sanitization,
-                timestamp)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                claim_verification, timestamp)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 event.conversation_id,
                 event.prompt,
@@ -97,6 +100,7 @@ def log_event(event: AuditEvent) -> None:
                 event.output_guardrail.model_dump_json() if event.output_guardrail else None,
                 event.optical.model_dump_json() if event.optical else None,
                 event.sanitization.model_dump_json() if event.sanitization else None,
+                event.claim_verification.model_dump_json() if event.claim_verification else None,
                 event.timestamp.isoformat(),
             ),
         )
@@ -117,6 +121,7 @@ def _row_to_audit_event(row: tuple) -> AuditEvent:
         output_guardrail_json,
         optical_json,
         sanitization_json,
+        claim_verification_json,
         timestamp,
     ) = row
     return AuditEvent(
@@ -132,6 +137,9 @@ def _row_to_audit_event(row: tuple) -> AuditEvent:
         optical=OpticalAuditMeta.model_validate_json(optical_json) if optical_json else None,
         sanitization=SanitizationAuditMeta.model_validate_json(sanitization_json)
         if sanitization_json
+        else None,
+        claim_verification=ClaimVerificationMeta.model_validate_json(claim_verification_json)
+        if claim_verification_json
         else None,
         timestamp=datetime.fromisoformat(timestamp),
     )
@@ -154,7 +162,7 @@ def get_recent_events(conversation_id: str, limit: int = 10) -> list[AuditEvent]
         rows = conn.execute(
             """SELECT conversation_id, prompt, user_role, risk_assessment,
                policy_decision, llm, output_guardrail, optical, sanitization,
-               timestamp
+               claim_verification, timestamp
                FROM audit_log
                WHERE conversation_id = ?
                ORDER BY id DESC

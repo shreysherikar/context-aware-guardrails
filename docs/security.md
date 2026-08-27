@@ -80,7 +80,7 @@ Security concepts the project aims for that do not exist yet:
 
 | Concept | Status |
 |---|---|
-| Claim/evidence verification against approved sources; RAG/retrieved-content protection | Planned — approach open |
+| Claim/evidence verification against approved sources; RAG/retrieved-content protection | **Partial** — verification implemented (deterministic extraction/retrieval/assessment over a curated YAML corpus; unsupported generated claims routed to REVIEW via policy); RAG-sourced-input protection remains open |
 | Audit governance: role-based access control, retention policy, protected-asset handling | Planned — storage decision open |
 | Transparency & appeal path (employees can contest decisions) | Planned |
 | AI-agent tool/action controls | Planned |

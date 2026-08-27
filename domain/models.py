@@ -16,7 +16,14 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from domain.enums import DataSensitivity, PolicyAction, RiskCategory, RiskLevel
+from domain.enums import (
+    DataSensitivity,
+    EvidenceRelationship,
+    PolicyAction,
+    RiskCategory,
+    RiskLevel,
+    VerificationStatus,
+)
 
 
 class GuardrailRequest(BaseModel):
@@ -113,6 +120,116 @@ class OutputGuardrailResult(BaseModel):
     error_kind: str | None = None
 
 
+# Claim/evidence verification — planned feature, contracts only for now.
+# Same family as TrajectoryAssessment/OpticalAssessment: structured metadata
+# produced outside the policy plane, consumed by it as one condition among
+# others. Nothing here carries authority.
+
+
+class Claim(BaseModel):
+    """One atomic factual claim extracted from generated text.
+
+    Extraction output is evidence only: a claim record takes no stance on its
+    own truthfulness and carries nothing that could authorize or reject it.
+    """
+
+    text: str
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
+class Evidence(BaseModel):
+    """One piece of approved-source material offered as grounding for a claim.
+
+    `source_id` names the specific approved source, so any later audit event
+    is reproducible from exactly which sources did (or did not) back a claim.
+    """
+
+    source_id: str
+    text: str
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
+class EvidenceAssessment(BaseModel):
+    """Verification verdict for ONE claim against approved-source evidence.
+
+    Structured metadata only. It intentionally has no `action`/`decision`
+    field: what happens to an unsupported claim is determined solely by the
+    deterministic PolicyEngine (and the API layer), never by this record.
+    """
+
+    claim: Claim
+    status: VerificationStatus
+    # Optional finer-grained verdict from the deterministic corpus assessor
+    # (services/evidence_relationship): SUPPORTS / CONTRADICTS / INSUFFICIENT /
+    # CONFLICTING. Recorded only when verification ran against retrieved
+    # approved-source passages; None means the claim was judged without that
+    # stage. Evidence only — like `status`, it never authorizes anything, and
+    # when it disagrees with `status`, every derived view resolves to the
+    # weaker reading (see ClaimEvidenceAssessment.all_verified).
+    relationship: EvidenceRelationship | None = None
+    supporting_evidence: list[Evidence] = Field(default_factory=list)
+    reasoning: str = ""
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
+class ClaimEvidenceAssessment(BaseModel):
+    """Aggregate claim/evidence verification of one generated response.
+
+    Evidence in, no PolicyDecision out. `unverified_claims` and
+    `all_supported` are derived views over `assessments` (computed on every
+    access), so the summary an auditor reads can never disagree with the
+    per-claim detail — and any status other than SUPPORTED counts as
+    unverified, keeping the aggregate conservative against future enum values.
+    """
+
+    assessments: list[EvidenceAssessment] = Field(default_factory=list)
+
+    @property
+    def unverified_claims(self) -> list[str]:
+        """Texts of every claim not SUPPORTED, in assessment order."""
+        return [
+            assessment.claim.text
+            for assessment in self.assessments
+            if assessment.status != VerificationStatus.SUPPORTED
+        ]
+
+    @property
+    def all_supported(self) -> bool:
+        """True when nothing is unverified; vacuously true with no claims.
+
+        Mirrors OutputAssessment semantics: absence of flagged content is not
+        itself a finding.
+        """
+        return all(
+            assessment.status == VerificationStatus.SUPPORTED for assessment in self.assessments
+        )
+
+    @property
+    def all_verified(self) -> bool:
+        """True only when every claim clears BOTH verdict levels, conservatively.
+
+        A claim counts as verified solely when its status is SUPPORTED and,
+        where a corpus relationship was recorded, that relationship is
+        SUPPORTS. Every other combination counts as not verified, including
+        statuses/relationships added to either enum later (unknown values are
+        never trusted) and disagreeing metadata such as a SUPPORTED status
+        alongside CONTRADICTS/CONFLICTING/INSUFFICIENT. The aggregate can
+        therefore never certify a claim more strongly than its weakest
+        metadata (fail closed). Vacuously true with no claims, mirroring
+        ``all_supported``: absence of assessed content is not itself a
+        finding. This is the view the deterministic PolicyEngine reads; like
+        every member of this model family it carries no authority of its own.
+        """
+        return all(
+            assessment.status == VerificationStatus.SUPPORTED
+            and (
+                assessment.relationship is None
+                or assessment.relationship == EvidenceRelationship.SUPPORTS
+            )
+            for assessment in self.assessments
+        )
+
+
 class OCREntity(BaseModel):
     """A span extracted by OCR (evidence only — never a policy decision)."""
 
@@ -180,6 +297,36 @@ class SanitizationAuditMeta(BaseModel):
     failure_kind: str | None = None
 
 
+class ClaimVerificationMeta(BaseModel):
+    """Audit signals for post-generation claim/evidence verification.
+
+    ``assessment`` stores the EXACT structured evidence the deterministic
+    PolicyEngine consumed for its EVIDENCE-001 evaluation (per-claim status,
+    relationship, and supporting source IDs), so a claims-driven REVIEW can be
+    reproduced from the audit record plus risk assessment, verified role and
+    policy version alone. Provenance versions name the corpus revision and the
+    retrieval/relationship implementations that produced the verdicts. Like the
+    other audit metadata here, generated response text itself is never stored.
+    """
+
+    # Stage ran for this generated response.
+    attempted: bool = False
+    # Stage completed without internal failure; failures carry failure_kind.
+    succeeded: bool = True
+    # Claims were actually extracted and assessed (a clean run with zero
+    # verifiable sentences is applied=False).
+    applied: bool = False
+    # Exact evidence input to the deterministic PolicyEngine (may be empty —
+    # absence of assessed content is not itself a finding, mirroring
+    # OutputAssessment: an empty aggregate verifies vacuously in policy terms).
+    assessment: ClaimEvidenceAssessment = Field(default_factory=ClaimEvidenceAssessment)
+    corpus_version: str | None = None
+    retrieval_version: str = ""
+    relationship_version: str = ""
+    verifier_version: str = ""
+    failure_kind: str | None = None
+
+
 class AuditEvent(BaseModel):
     conversation_id: str
     prompt: str
@@ -191,4 +338,5 @@ class AuditEvent(BaseModel):
     output_guardrail: OutputGuardrailResult | None = None
     optical: OpticalAuditMeta | None = None
     sanitization: SanitizationAuditMeta | None = None
+    claim_verification: ClaimVerificationMeta | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -2,10 +2,11 @@
 
 This module only wires the pieces together: it contains no business logic. The
 risk-classifier implementation is chosen by LLM_PROVIDER, the post-ALLOW
-generative gateway by LLM_GENERATION_PROVIDER, and the post-generation output
-guardrail by OUTPUT_GUARDRAIL_PROVIDER (all independent); see the respective
-factories in services/. Optical OCR is chosen by OPTICAL_OCR_PROVIDER.
-Caller identity comes from a verified HS256 bearer token (services/auth):
+generative gateway by LLM_GENERATION_PROVIDER, the post-generation output
+guardrail by OUTPUT_GUARDRAIL_PROVIDER, and the post-generation claim/evidence
+verifier by CLAIM_VERIFICATION_PROVIDER (all independent); see the respective
+factories in services/. Optical OCR is chosen by OPTICAL_OCR_PROVIDER. Caller
+identity comes from a verified HS256 bearer token (services/auth):
 /guardrail/evaluate and /guardrail/evaluate-image require it, and the role fed
 to the policy engine is the verified claim, never a request field.
 
@@ -40,6 +41,7 @@ from pydantic import BaseModel  # noqa: E402
 from domain.enums import PolicyAction  # noqa: E402
 from domain.models import (  # noqa: E402
     AuditEvent,
+    ClaimVerificationMeta,
     GuardrailRequest,
     LLMResult,
     OpticalAssessment,
@@ -48,9 +50,13 @@ from domain.models import (  # noqa: E402
     PolicyDecision,
     RiskAssessment,
     SanitizationAuditMeta,
+    TrajectoryAssessment,
 )
 from services import auth  # noqa: E402
 from services.audit.audit import log_event  # noqa: E402
+from services.claim_verification import build_audit_meta  # noqa: E402
+from services.claim_verification.factory import get_claim_verifier  # noqa: E402
+from services.claim_verification.models import unverified_failure_response  # noqa: E402
 from services.llm import LLMRequest  # noqa: E402
 from services.llm.factory import get_gateway  # noqa: E402
 from services.optical_guardrail.analyzer import OpticalAnalyzer  # noqa: E402
@@ -80,6 +86,7 @@ classifier = get_classifier()
 policy_engine = PolicyEngine()
 gateway = get_gateway()
 output_guardrail = get_output_guardrail()
+claim_verifier = get_claim_verifier()
 ocr_provider = get_ocr_provider()
 optical_analyzer = OpticalAnalyzer()
 sanitization_engine = get_sanitization_engine()
@@ -117,6 +124,27 @@ def _flagged_for_review_response() -> dict[str, object]:
         "blocked": False,
         "review_required": True,
     }
+
+
+def _claims_review_response(
+    *,
+    decision: PolicyDecision,
+    risk: RiskAssessment,
+    extra: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Post-generation policy outcome changed (e.g. EVIDENCE-001 claims REVIEW).
+
+    Uses the standard terminal-stop shape: the generated content and the claim
+    details stay internal — they exist only in the audit record.
+    """
+    body: dict[str, object] = {
+        "decision": decision,
+        "risk_assessment": risk,
+        **_stop_response(decision.action),
+    }
+    if extra:
+        body.update(extra)
+    return body
 
 
 _GENERIC_401 = HTTPException(status_code=401, detail="Unauthorized")
@@ -169,14 +197,35 @@ def health():
 async def _generate_and_guard(
     *,
     prompt_for_llm: str,
-) -> tuple[LLMResult, OutputGuardrailResult, str | None]:
-    """Run post-policy generation + output guardrail (fail-closed).
+    risk: RiskAssessment,
+    user_role: str,
+    trajectory: TrajectoryAssessment | None,
+    decision: PolicyDecision,
+    input_type: str | None = None,
+) -> tuple[
+    LLMResult,
+    OutputGuardrailResult,
+    ClaimVerificationMeta | None,
+    PolicyDecision,
+    str | None,
+]:
+    """Run post-policy generation + output guardrail + claim verification.
 
     ``prompt_for_llm`` must already be the safe representation (original for
     ALLOW, sanitized for REWRITE).
+
+    After a successful generation, the optional claim/evidence verifier runs and
+    THE SAME deterministic policy engine re-evaluates with the claims evidence
+    supplied — its EVIDENCE-001 rule routes unsupported / contradicted /
+    conflicting / insufficient claims to REVIEW. The returned decision equals
+    ``decision`` when no verification ran or every claim was supported, and is
+    strictly more conservative otherwise; it can never become more permissive
+    than the input-side decision. Callers must persist and return THIS decision.
     """
     llm_result = LLMResult(attempted=False, succeeded=False)
     output_result = OutputGuardrailResult(attempted=False, flagged=False)
+    claim_meta: ClaimVerificationMeta | None = None
+    effective_decision = decision
     generated: str | None = None
     try:
         if gateway is None:
@@ -205,7 +254,26 @@ async def _generate_and_guard(
             output_result.error_kind = type(exc).__name__
             logger.exception("Output guardrail failed for a permitted request")
 
-    return llm_result, output_result, generated
+        if claim_verifier is not None:
+            try:
+                verification = claim_verifier.verify(generated)
+                claim_meta = build_audit_meta(verification)
+            except Exception as exc:  # noqa: BLE001 - defensive depth; verify() never raises
+                logger.exception("Claim/evidence verification stage failed unexpectedly")
+                failure = unverified_failure_response(
+                    type(exc).__name__,
+                    error_kind="verification_failed",
+                )
+                claim_meta = build_audit_meta(failure)
+            effective_decision = policy_engine.evaluate(
+                risk,
+                user_role,
+                input_type=input_type,
+                trajectory=trajectory,
+                claims=claim_meta.assessment,
+            )
+
+    return llm_result, output_result, claim_meta, effective_decision, generated
 
 
 def _generation_response(
@@ -218,7 +286,13 @@ def _generation_response(
     action: PolicyAction,
     extra: dict[str, object] | None = None,
 ) -> dict[str, object] | JSONResponse:
-    """Shared response shaping after generation / output-guardrail."""
+    """Shared response shaping after generation / output-guardrail / claims."""
+    if decision.action != action:
+        # Post-generation re-evaluation degraded the outcome (EVIDENCE-001 on
+        # unsupported/contradicted claims): route to review instead of ever
+        # returning the generated content.
+        return _claims_review_response(decision=decision, risk=risk, extra=extra)
+
     if llm_result.attempted and not llm_result.succeeded:
         return JSONResponse(
             status_code=503,
@@ -353,8 +427,13 @@ async def evaluate(
         # ALLOW: original safe content may proceed; do not invoke sanitizer.
         prompt_for_llm = request.prompt
 
-    llm_result, output_result, generated = await _generate_and_guard(
+    initial_action = decision.action
+    llm_result, output_result, claim_meta, decision, generated = await _generate_and_guard(
         prompt_for_llm=prompt_for_llm,
+        risk=risk,
+        user_role=verified_role,
+        trajectory=trajectory,
+        decision=decision,
     )
 
     log_event(
@@ -367,6 +446,7 @@ async def evaluate(
             llm=llm_result,
             output_guardrail=output_result,
             sanitization=sanitization_meta,
+            claim_verification=claim_meta,
         )
     )
 
@@ -376,7 +456,7 @@ async def evaluate(
         llm_result=llm_result,
         output_result=output_result,
         generated=generated,
-        action=decision.action,
+        action=initial_action,
         extra=extra,
     )
 
@@ -516,8 +596,14 @@ async def evaluate_image(
         # ALLOW: OCR text is already low-risk; do not sanitize unnecessarily.
         prompt_for_llm = optical.ocr_text
 
-    llm_result, output_result, generated = await _generate_and_guard(
+    initial_action = decision.action
+    llm_result, output_result, claim_meta, decision, generated = await _generate_and_guard(
         prompt_for_llm=prompt_for_llm,
+        risk=risk,
+        user_role=verified_role,
+        trajectory=trajectory,
+        decision=decision,
+        input_type="image",
     )
 
     log_event(
@@ -531,6 +617,7 @@ async def evaluate_image(
             output_guardrail=output_result,
             optical=optical_meta,
             sanitization=sanitization_meta,
+            claim_verification=claim_meta,
         )
     )
 
@@ -540,6 +627,6 @@ async def evaluate_image(
         llm_result=llm_result,
         output_result=output_result,
         generated=generated,
-        action=decision.action,
+        action=initial_action,
         extra=extra,
     )

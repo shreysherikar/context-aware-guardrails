@@ -116,22 +116,22 @@ def evaluate_conversation(
     the audit store (it cannot be there yet: log_event runs after the policy
     decision).
 
-    Fail-open on history-lookup failure: trajectory checking is an enhancement
-    over single-turn policy, so a DB outage must not force REVIEW (or crash).
-    Single-turn policy enforcement remains the fail-closed primary safety net.
+    Fail-closed on history-lookup failure: if the audit-history lookup throws,
+    trajectory escalates to REVIEW rather than silently degrading to
+    single-turn policy. This ensures the fail-closed principle applies across
+    all authoritative gates, not just the primary policy engine.
     """
     try:
         prior_events = get_recent_events(conversation_id, limit=window_limit)
-    except Exception:  # noqa: BLE001 - deliberate fail-open with logged warning
+    except Exception:  # noqa: BLE001 - deliberate fail-closed with logged warning
         logger.warning(
-            "Trajectory history lookup failed for conversation %r; "
-            "proceeding on single-turn policy only",
+            "Trajectory history lookup failed for conversation %r; failing closed to REVIEW",
             conversation_id,
             exc_info=True,
         )
         return TrajectoryAssessment(
-            escalate=False,
-            reason="trajectory history lookup failed; single-turn policy remains authoritative",
+            escalate=True,
+            reason="trajectory history lookup failed; failing closed to REVIEW",
         )
 
     prior_assessments = [event.risk_assessment for event in prior_events]

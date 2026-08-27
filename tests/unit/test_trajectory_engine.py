@@ -2,7 +2,7 @@
 
 Pins the exact signal definitions: the non-decreasing trend rule, repeated
 non-NONE category probing, MEDIUM+ turn counting, the no-double-count window
-guarantee, the fail-open behaviour on history-lookup failure, and the
+guarantee, the fail-closed behaviour on history-lookup failure, and the
 structural constraint that TrajectoryAssessment carries no policy action.
 """
 
@@ -158,16 +158,16 @@ def test_evaluate_conversation_counts_each_turn_once(monkeypatch, tmp_path):
     assert result.medium_or_above_count == 3
 
 
-# --- fail-open on history-lookup failure --------------------------------------
+# --- fail-closed on history-lookup failure --------------------------------------
 
 
-def test_history_lookup_failure_fails_open(monkeypatch):
+def test_history_lookup_failure_fails_closed(monkeypatch):
     def _boom(conversation_id: str, limit: int = 10):
         raise RuntimeError("database unavailable")
 
     monkeypatch.setattr("services.trajectory_engine.engine.get_recent_events", _boom)
     result = evaluate_conversation("any-conv", _ra(RiskLevel.HIGH))
-    assert result.escalate is False
+    assert result.escalate is True
     assert "failed" in result.reason.lower()
 
 

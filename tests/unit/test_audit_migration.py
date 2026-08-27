@@ -10,14 +10,23 @@ in place and writes rows correctly.
 import json
 import sqlite3
 
-from domain.enums import PolicyAction, RiskLevel
+from domain.enums import (
+    EvidenceRelationship,
+    PolicyAction,
+    RiskLevel,
+    VerificationStatus,
+)
 from domain.models import (
     AuditEvent,
+    Claim,
+    ClaimEvidenceAssessment,
+    ClaimVerificationMeta,
+    EvidenceAssessment,
     OutputGuardrailResult,
     PolicyDecision,
     RiskAssessment,
 )
-from services.audit.audit import log_event
+from services.audit.audit import get_recent_events, log_event
 
 
 def _make_event(
@@ -197,3 +206,52 @@ def test_pre_optical_schema_is_migrated(monkeypatch, tmp_path):
         assert json.loads(row[0])["image_sha256"] == "abc"
     finally:
         check.close()
+
+
+def test_pre_claim_verification_schema_is_migrated_and_meta_round_trips(monkeypatch, tmp_path):
+    """A database created before the claim_verification column existed keeps
+    working, stores the exact claims evidence, and reads it back unchanged."""
+    target = tmp_path / "pre_claims.db"
+    _create_old_schema_db(target)  # schema predates llm/output_guardrail too
+    monkeypatch.setenv("AUDIT_DB_PATH", str(target))
+
+    meta = ClaimVerificationMeta(
+        attempted=True,
+        succeeded=True,
+        applied=True,
+        assessment=ClaimEvidenceAssessment(
+            assessments=[
+                EvidenceAssessment(
+                    claim=Claim(text="Drug X cures condition Y", confidence=0.9),
+                    status=VerificationStatus.UNSUPPORTED,
+                    relationship=EvidenceRelationship.CONTRADICTS,
+                    reasoning="approved sources say otherwise",
+                    confidence=0.7,
+                )
+            ]
+        ),
+        corpus_version="1.0.0",
+        retrieval_version="1.0.0",
+        relationship_version="1.0.0",
+        verifier_version="1.0.0",
+    )
+    log_event(
+        AuditEvent(
+            conversation_id="mig-claims",
+            prompt="hello",
+            user_role="researcher",
+            risk_assessment=RiskAssessment(risk_level=RiskLevel.LOW),
+            policy_decision=PolicyDecision(
+                action=PolicyAction.ALLOW, policy_id="LOW-001", policy_version="0.2.0"
+            ),
+            claim_verification=meta,
+        )
+    )
+
+    # The missing column was added in place ...
+    assert "claim_verification" in _columns(target)
+
+    # ...and deserializes back to an identical, decision-reproducible record.
+    restored = get_recent_events("mig-claims")
+    assert len(restored) == 1
+    assert restored[0].claim_verification == meta

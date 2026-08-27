@@ -1,8 +1,10 @@
-version: "0.1.0"
+version: "0.2.0"
 
 # Rules are evaluated top to bottom; the first match wins.
 # Order matters: put the most severe / specific rules first.
 # Rules with input_types only apply to that intake path (e.g. image).
+# Rules with claims_supported only apply when a ClaimEvidenceAssessment was
+# actually supplied for evaluation.
 rules:
   # ── Direct-match BLOCK / REVIEW rules: take priority regardless of history. ──
   - id: INJECTION-001
@@ -54,6 +56,22 @@ rules:
   - id: TRAJECTORY-001
     description: "Repeated sensitive-category probing or a non-decreasing risk trajectory across turns in this conversation — route to human review even though this turn alone would not."
     trajectory_escalate: true
+    action: REVIEW
+
+  # ── Generated-output claim/evidence verification (evidence from the claim/
+  #    evidence assessment: contradicted, conflicting, or insufficient). ──
+  # Placement contract: BELOW every direct-match BLOCK/REVIEW rule and the
+  # trajectory rule above, ABOVE the softer single-turn friction rules below —
+  # a generated claim unsupported by approved-source evidence cannot be fixed
+  # by rewriting or clarifying the request, so it must outrank
+  # REWRITE/CLARIFY/ALLOW. Evidence verification is a post-generation,
+  # output-side check, so it is deliberately NOT gated by input risk level.
+  # A low-risk input can still produce an unsupported generated claim, and the
+  # risk in this rule lives in the generated content rather than the request's
+  # risk category. Do not re-gate this rule without re-reading this comment.
+  - id: EVIDENCE-001
+    description: "Assessed claims are not fully supported by approved-source evidence — route to human review."
+    claims_supported: false
     action: REVIEW
 
   # ── Softer single-turn friction: first-line REWRITE / CLARIFY responses. ──

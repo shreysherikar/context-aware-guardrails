@@ -2,8 +2,21 @@ from pathlib import Path
 
 import pytest
 
-from domain.enums import DataSensitivity, PolicyAction, RiskCategory, RiskLevel
-from domain.models import RiskAssessment, TrajectoryAssessment
+from domain.enums import (
+    DataSensitivity,
+    EvidenceRelationship,
+    PolicyAction,
+    RiskCategory,
+    RiskLevel,
+    VerificationStatus,
+)
+from domain.models import (
+    Claim,
+    ClaimEvidenceAssessment,
+    EvidenceAssessment,
+    RiskAssessment,
+    TrajectoryAssessment,
+)
 from services.policy_engine.engine import PolicyEngine
 from services.policy_engine.policy_models import PolicyValidationError
 
@@ -241,3 +254,202 @@ def test_direct_review_rules_take_priority_over_escalation():
     decision = engine.evaluate(risk, "researcher", trajectory=trajectory)
     assert decision.action == PolicyAction.REVIEW
     assert decision.policy_id == "PHI-001"
+
+
+# --- claim/evidence verification conditions ------------------------------------
+
+
+def _claim(text: str) -> Claim:
+    return Claim(text=text, confidence=0.9)
+
+
+def _claim_assessment(
+    text: str,
+    *,
+    status: VerificationStatus,
+    relationship: EvidenceRelationship | None = None,
+) -> EvidenceAssessment:
+    """One per-claim verdict as a verification stage emits it: ``status`` is
+    mandatory; ``relationship`` only when the corpus assessor ran."""
+    return EvidenceAssessment(
+        claim=_claim(text),
+        status=status,
+        relationship=relationship,
+        reasoning="checked against approved sources",
+        confidence=0.8,
+    )
+
+
+def _supported_claim(text: str) -> EvidenceAssessment:
+    return _claim_assessment(
+        text,
+        status=VerificationStatus.SUPPORTED,
+        relationship=EvidenceRelationship.SUPPORTS,
+    )
+
+
+def _contradicted_claim(text: str) -> EvidenceAssessment:
+    return _claim_assessment(
+        text,
+        status=VerificationStatus.UNSUPPORTED,
+        relationship=EvidenceRelationship.CONTRADICTS,
+    )
+
+
+def _claims(*assessments: EvidenceAssessment) -> ClaimEvidenceAssessment:
+    return ClaimEvidenceAssessment(assessments=list(assessments))
+
+
+def test_high_risk_with_insufficient_evidence_routes_to_review():
+    """HIGH-risk turn plus an INSUFFICIENT verdict lands on EVIDENCE-001 REVIEW.
+
+    This exact profile would otherwise fall through to the fail-closed default
+    BLOCK, so matching EVIDENCE-001 proves the new rule decided — deterministically
+    from the risk profile plus the supplied evidence alone.
+    """
+    risk = RiskAssessment(risk_level=RiskLevel.HIGH, categories=[RiskCategory.NONE])
+    claims = _claims(
+        _claim_assessment(
+            "Drug X cures condition Y",
+            status=VerificationStatus.UNVERIFIABLE,
+            relationship=EvidenceRelationship.INSUFFICIENT,
+        )
+    )
+    decision = engine.evaluate(risk, "researcher", claims=claims)
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "EVIDENCE-001"
+
+
+def test_contradicted_claim_routes_to_review():
+    """One CONTRADICTS verdict makes the whole assessment unverified, even
+    alongside a fully supported claim."""
+    risk = RiskAssessment(risk_level=RiskLevel.MEDIUM, categories=[RiskCategory.NONE])
+    claims = _claims(
+        _contradicted_claim("Drug X cures condition Y"),
+        _supported_claim("Drug X treats condition Y"),
+    )
+    decision = engine.evaluate(risk, "researcher", claims=claims)
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "EVIDENCE-001"
+
+
+def test_conflicting_evidence_routes_to_review():
+    """CONFLICTING passages cannot be resolved automatically — human review."""
+    risk = RiskAssessment(risk_level=RiskLevel.MEDIUM, categories=[RiskCategory.NONE])
+    claims = _claims(
+        _claim_assessment(
+            "Drug X cures condition Y",
+            status=VerificationStatus.UNSUPPORTED,
+            relationship=EvidenceRelationship.CONFLICTING,
+        ),
+    )
+    decision = engine.evaluate(risk, "researcher", claims=claims)
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "EVIDENCE-001"
+
+
+def test_supported_claim_does_not_trigger_evidence_review():
+    """A fully supported claim clears EVIDENCE-001 and falls through unchanged."""
+    risk = RiskAssessment(risk_level=RiskLevel.LOW, categories=[RiskCategory.NONE])
+    claims = _claims(_supported_claim("Drug X treats condition Y"))
+    decision = engine.evaluate(risk, "researcher", claims=claims)
+    assert decision.action == PolicyAction.ALLOW
+    assert decision.policy_id == "LOW-001"
+
+
+def test_low_risk_with_unsupported_claims_routes_to_evidence_review():
+    """LOW-risk turns with unsupported claims trigger EVIDENCE-001 because
+    evidence verification is a post-generation output-side check, not gated by
+    the input's risk level. A low-risk input can still produce hallucinations."""
+    risk = RiskAssessment(risk_level=RiskLevel.LOW, categories=[RiskCategory.NONE])
+    claims = _claims(_contradicted_claim("Drug X cures condition Y"))
+    decision = engine.evaluate(risk, "researcher", claims=claims)
+    # Unsupported claims always escalate to EVIDENCE-001 REVIEW, regardless of
+    # input risk level, because the risk lives in the generated output.
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "EVIDENCE-001"
+
+
+def test_missing_claim_assessment_skips_evidence_rule():
+    """Backward compatibility: callers without a verification stage unaffected."""
+    risk = RiskAssessment(risk_level=RiskLevel.LOW, categories=[RiskCategory.NONE])
+    decision = engine.evaluate(risk, "researcher")
+    assert decision.action == PolicyAction.ALLOW
+    assert decision.policy_id == "LOW-001"
+
+
+def test_disagreeing_metadata_resolves_conservatively_not_as_verified():
+    """A SUPPORTED status next to a CONTRADICTS relationship can never certify
+    the claim: the aggregate reads its weakest metadata (fail closed)."""
+    risk = RiskAssessment(risk_level=RiskLevel.MEDIUM, categories=[RiskCategory.NONE])
+    claims = _claims(
+        _claim_assessment(
+            "Drug X cures condition Y",
+            status=VerificationStatus.SUPPORTED,
+            relationship=EvidenceRelationship.CONTRADICTS,
+        ),
+    )
+    decision = engine.evaluate(risk, "researcher", claims=claims)
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "EVIDENCE-001"
+
+
+def test_direct_block_rules_take_priority_over_evidence_review():
+    """An input-plane injection block still wins over output-evidence review."""
+    risk = RiskAssessment(
+        risk_level=RiskLevel.CRITICAL,
+        categories=[RiskCategory.PROMPT_INJECTION],
+        injection_detected=True,
+    )
+    decision = engine.evaluate(
+        risk,
+        "researcher",
+        claims=_claims(_contradicted_claim("Drug X cures condition Y")),
+    )
+    assert decision.action == PolicyAction.BLOCK
+    assert decision.policy_id == "INJECTION-002"
+
+
+def test_trajectory_review_takes_priority_over_evidence_review():
+    """TRAJECTORY-001 sits above EVIDENCE-001: conversation history first."""
+    risk = RiskAssessment(risk_level=RiskLevel.MEDIUM, categories=[RiskCategory.NONE])
+    trajectory = TrajectoryAssessment(escalate=True, reason="prior probing")
+    decision = engine.evaluate(
+        risk,
+        "researcher",
+        trajectory=trajectory,
+        claims=_claims(_contradicted_claim("Drug X cures condition Y")),
+    )
+    assert decision.action == PolicyAction.REVIEW
+    assert decision.policy_id == "TRAJECTORY-001"
+
+
+@pytest.mark.parametrize(
+    ("risk", "baseline_policy_id"),
+    [
+        (
+            RiskAssessment(
+                risk_level=RiskLevel.MEDIUM,
+                categories=[RiskCategory.PII],
+                data_sensitivity=DataSensitivity.CONFIDENTIAL,
+            ),
+            "PII-001",
+        ),
+        (
+            RiskAssessment(risk_level=RiskLevel.MEDIUM, categories=[RiskCategory.OFF_LABEL]),
+            "OFFLABEL-001",
+        ),
+    ],
+)
+def test_evidence_review_outranks_single_turn_friction_rules(risk, baseline_policy_id):
+    """Without an assessment the friction rule (REWRITE/CLARIFY) fires; with one
+    whose claims are unsupported, EVIDENCE-001 must take precedence instead —
+    rewriting or clarifying cannot repair an unsupported generated claim."""
+    baseline = engine.evaluate(risk, "researcher")
+    assert baseline.policy_id == baseline_policy_id
+
+    with_claims = engine.evaluate(
+        risk, "researcher", claims=_claims(_contradicted_claim("Drug X cures condition Y"))
+    )
+    assert with_claims.action == PolicyAction.REVIEW
+    assert with_claims.policy_id == "EVIDENCE-001"

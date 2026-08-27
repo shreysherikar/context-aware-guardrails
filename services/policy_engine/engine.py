@@ -18,8 +18,13 @@ from pathlib import Path
 
 import yaml
 
-from domain.enums import PolicyAction
-from domain.models import PolicyDecision, RiskAssessment, TrajectoryAssessment
+from domain.enums import PolicyAction, RiskLevel
+from domain.models import (
+    ClaimEvidenceAssessment,
+    PolicyDecision,
+    RiskAssessment,
+    TrajectoryAssessment,
+)
 from services.policy_engine.policy_models import (
     PolicyFile,
     PolicyRule,
@@ -29,6 +34,15 @@ from services.policy_engine.policy_models import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[2] / "policies" / "policy.yaml"
+
+# Risk level ordering for minimum-threshold comparisons.
+_RISK_LEVEL_ORDER = {
+    RiskLevel.NONE: 0,
+    RiskLevel.LOW: 1,
+    RiskLevel.MEDIUM: 2,
+    RiskLevel.HIGH: 3,
+    RiskLevel.CRITICAL: 4,
+}
 
 
 class PolicyEngine:
@@ -61,11 +75,12 @@ class PolicyEngine:
         user_role: str,
         input_type: str | None = None,
         trajectory: TrajectoryAssessment | None = None,
+        claims: ClaimEvidenceAssessment | None = None,
     ) -> PolicyDecision:
         version = self._policy.version
         try:
             for rule in self._policy.rules:
-                if self._rule_matches(rule, risk, user_role, input_type, trajectory):
+                if self._rule_matches(rule, risk, user_role, input_type, trajectory, claims):
                     return PolicyDecision(
                         action=rule.action,
                         policy_id=rule.id,
@@ -96,6 +111,7 @@ class PolicyEngine:
         user_role: str,
         input_type: str | None = None,
         trajectory: TrajectoryAssessment | None = None,
+        claims: ClaimEvidenceAssessment | None = None,
     ) -> bool:
         # Rules with input_types only match when the caller supplies a matching
         # input_type (e.g. "image"). Empty input_types = unrestricted (text + image).
@@ -108,8 +124,21 @@ class PolicyEngine:
         if rule.trajectory_escalate is not None:
             if trajectory is None or trajectory.escalate != rule.trajectory_escalate:
                 return False
+        # Claim/evidence condition: evidence only. A rule requiring verified
+        # claims never matches when no claim/evidence assessment is supplied,
+        # so callers without a verification stage are unaffected. Verified-ness
+        # comes from the aggregate's conservative derived view; this engine adds
+        # no claim logic of its own.
+        if rule.claims_supported is not None:
+            if claims is None or claims.all_verified != rule.claims_supported:
+                return False
         if rule.risk_level is not None and rule.risk_level != risk.risk_level:
             return False
+        if rule.min_risk_level is not None:
+            if _RISK_LEVEL_ORDER.get(risk.risk_level, 0) < _RISK_LEVEL_ORDER.get(
+                rule.min_risk_level, 0
+            ):
+                return False
         if rule.category is not None and rule.category not in risk.categories:
             return False
         # Disguise and injection are separate signals: either can be present
