@@ -52,7 +52,7 @@ class PolicyEngine:
 
     def _load_policy(self) -> PolicyFile:
         try:
-            with open(self.policy_path) as f:
+            with open(self.policy_path, encoding="utf-8") as f:
                 raw = yaml.safe_load(f)
         except FileNotFoundError as exc:
             raise PolicyValidationError(f"Policy file not found: {self.policy_path}") from exc

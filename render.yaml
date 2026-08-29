@@ -1,0 +1,53 @@
+# Render Blueprint — deploys the EXISTING Dockerfile at the repo root as a free
+# web service. Deployment config only: no application code and NO secret values.
+# Anything secret, or needing an explicit opt-in, is marked `sync: false` and set
+# by hand in the Render dashboard — never commit a real value here.
+#
+# To deploy: push this file, then render.com dashboard → New → Blueprint and pick
+# this repo (it discovers render.yaml and builds ./Dockerfile). Alternative
+# dashboard path: New → Web Service → pick this repo, runtime Docker — the
+# Dockerfile is auto-detected and its `EXPOSE 8000` tells Render which port to
+# route external traffic to, so no extra port config is needed.
+#
+# Dashboard env vars (set once after the service is created):
+#   AUTH_DEV_MODE=true
+#   AUTH_JWT_SECRET=<openssl rand -hex 32>      (REQUIRED; empty => startup fails)
+#   LLM_PROVIDER=mock
+#   LLM_GENERATION_PROVIDER=groq               (OPTIONAL — see comment below)
+#   GROQ_API_KEY=<key>                          (OPTIONAL — set WITH provider)
+#   GROQ_MODEL=openai/gpt-oss-20b
+#
+# IMPORTANT: LLM_GENERATION_PROVIDER=groq WITHOUT a GROQ_API_KEY crashes the app
+# at startup — the Groq client validates the key when the gateway is constructed
+# at import. Either set BOTH to groq+real key, or leave the provider unset and
+# keep the fully-offline mock demo.
+
+services:
+  - type: web
+    name: contextguard-demo
+    runtime: docker
+    repo: https://github.com/shreysherikar/context-aware-guardrails
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Dev-mode token issuance; required for the demo UI's "Start session".
+      - key: AUTH_DEV_MODE
+        value: "true"
+      # HS256 signing secret. Set in dashboard; empty => the app refuses to
+      # start (fail-closed auth, deliberate).
+      - key: AUTH_JWT_SECRET
+        sync: false
+      # Risk classifier: mock = offline, deterministic, no network/credentials.
+      - key: LLM_PROVIDER
+        value: mock
+      # Optional live generation — set in dashboard to "groq" only together with
+      # a real GROQ_API_KEY. Leave empty for the offline demo.
+      - key: LLM_GENERATION_PROVIDER
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b

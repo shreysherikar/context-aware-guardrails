@@ -25,6 +25,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from pathlib import Path  # noqa: E402
+
 from fastapi import (  # noqa: E402
     Depends,
     FastAPI,
@@ -36,6 +38,7 @@ from fastapi import (  # noqa: E402
     UploadFile,
 )
 from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from domain.enums import PolicyAction  # noqa: E402
@@ -630,3 +633,13 @@ async def evaluate_image(
         action=initial_action,
         extra=extra,
     )
+
+
+# Static demo UI (wiring only, no business logic): serve apps/web/ at GET / so
+# judges can drive the API from the browser with zero build step. Mounted LAST
+# so every API route defined above takes precedence over it.
+app.mount(
+    "/",
+    StaticFiles(directory=Path(__file__).resolve().parents[1] / "web", html=True),
+    name="web",
+)
