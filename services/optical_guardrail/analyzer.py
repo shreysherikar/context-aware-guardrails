@@ -1,6 +1,7 @@
-"""Optical analyzer — deterministic PII / PHI / injection evidence from OCR text.
+"""Optical analyzer — deterministic PII / PHI / injection / multimodal evidence from OCR.
 
 Produces OpticalAssessment only. Never decides ALLOW/BLOCK/REWRITE/REVIEW.
+All image content is treated as UNTRUSTED by default.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ import re
 
 from domain.enums import RiskCategory
 from domain.models import OCRResult, OpticalAssessment, OpticalFinding
+from services.multimodal.classifier import assess_multimodal_content
 
 # Prompt-injection patterns (evidence). Aligned with the text mock classifier
 # plus a few OCR-common phrasings from the P0 brief.
@@ -58,33 +60,74 @@ _PHI_KEYWORDS = [
     (r"\badverse\s+reaction\b|\bmedical\s+history\b", "clinical_note"),
 ]
 
+_CATEGORY_MAP: dict[str, RiskCategory] = {
+    "IMAGE_PROMPT_INJECTION": RiskCategory.PROMPT_INJECTION,
+    "POLICY_BYPASS_ATTEMPT": RiskCategory.PROMPT_INJECTION,
+    "VISUAL_AUTHORITY_SPOOFING": RiskCategory.AUTHORITY_SPOOFING,
+    "DATA_EXFILTRATION_ATTEMPT": RiskCategory.DATA_EXFILTRATION,
+    "SECRET_EXPOSURE": RiskCategory.MULTIMODAL_UNTRUSTED,
+    "MALICIOUS_URL": RiskCategory.CYBER_SAFETY,
+    "NETWORK_BYPASS_ATTEMPT": RiskCategory.CYBER_SAFETY,
+    "PHISHING_ATTEMPT": RiskCategory.PHISHING,
+    "MALWARE_EXECUTION_ATTEMPT": RiskCategory.MALWARE,
+    "COMPUTER_USE_MANIPULATION": RiskCategory.MULTIMODAL_UNTRUSTED,
+    "REGULATORY_MANIPULATION_ATTEMPT": RiskCategory.MULTIMODAL_UNTRUSTED,
+    "CLINICAL_SAFETY_VIOLATION": RiskCategory.PHI,
+    "MANUFACTURING_SAFETY_VIOLATION": RiskCategory.MULTIMODAL_UNTRUSTED,
+    "PRIVILEGE_ESCALATION_ATTEMPT": RiskCategory.PROMPT_INJECTION,
+}
+
 
 def _find_spans(pattern: re.Pattern[str], text: str) -> list[tuple[str, int, int]]:
     return [(m.group(0), m.start(), m.end()) for m in pattern.finditer(text)]
 
 
+def _multimodal_to_findings(assessment) -> list[OpticalFinding]:
+    findings: list[OpticalFinding] = []
+    for el in assessment.elements:
+        cat = _CATEGORY_MAP.get(el.threat_category or "", RiskCategory.MULTIMODAL_UNTRUSTED)
+        findings.append(
+            OpticalFinding(
+                type=el.threat_category or "multimodal_threat",
+                category=cat,
+                confidence=0.88,
+                text=el.content,
+                trust=el.trust,
+                threat_category=el.threat_category,
+            )
+        )
+    return findings
+
+
 class OpticalAnalyzer:
-    """Deterministic optical evidence extractor."""
+    """Deterministic optical evidence extractor with unified multimodal classification."""
 
     def analyze(self, ocr: OCRResult, *, image: bytes | None = None) -> OpticalAssessment:
-        # ``image`` reserved for future vision signals (faces, etc.); P0 is OCR-text only.
-        _ = image
+        _ = image  # reserved for future pixel-level vision signals
         text = ocr.text or ""
         findings: list[OpticalFinding] = []
         injection_detected = False
+
+        # Unified multimodal threat classification (all image OCR is untrusted)
+        multimodal = assess_multimodal_content(text, source="image")
+        findings.extend(_multimodal_to_findings(multimodal))
+        injection_detected = multimodal.injection_detected or multimodal.policy_bypass
 
         lower = text.lower()
         for pattern in _INJECTION_PATTERNS:
             if re.search(pattern, lower):
                 injection_detected = True
-                findings.append(
-                    OpticalFinding(
-                        type="prompt_injection",
-                        category=RiskCategory.PROMPT_INJECTION,
-                        confidence=0.85,
-                        text=pattern,
+                if not any(f.type == "prompt_injection" for f in findings):
+                    findings.append(
+                        OpticalFinding(
+                            type="prompt_injection",
+                            category=RiskCategory.PROMPT_INJECTION,
+                            confidence=0.85,
+                            text=pattern,
+                            trust="UNTRUSTED_INSTRUCTION",
+                            threat_category="IMAGE_PROMPT_INJECTION",
+                        )
                     )
-                )
                 break
 
         for match_text, _, _ in _find_spans(_EMAIL_RE, text):
@@ -94,11 +137,11 @@ class OpticalAnalyzer:
                     category=RiskCategory.PII,
                     confidence=0.9,
                     text=match_text,
+                    trust="DATA",
                 )
             )
 
         for match_text, _, _ in _find_spans(_PHONE_RE, text):
-            # Avoid treating long numeric IDs / MRNs as phones when labeled as MRN.
             if re.search(r"\bmrn\b", text[max(0, text.find(match_text) - 20) :].lower()):
                 continue
             findings.append(
@@ -107,6 +150,7 @@ class OpticalAnalyzer:
                     category=RiskCategory.PII,
                     confidence=0.75,
                     text=match_text,
+                    trust="DATA",
                 )
             )
 
@@ -118,6 +162,7 @@ class OpticalAnalyzer:
                     category=RiskCategory.PII,
                     confidence=0.9,
                     text=span.group(0) if span else "ssn",
+                    trust="DATA",
                 )
             )
 
@@ -129,6 +174,7 @@ class OpticalAnalyzer:
                     category=RiskCategory.PII,
                     confidence=0.9,
                     text=dob.group(0),
+                    trust="DATA",
                 )
             )
         elif re.search(r"\bdob\b|\bdate of birth\b", lower) and _DOB_BARE_RE.search(text):
@@ -139,6 +185,7 @@ class OpticalAnalyzer:
                     category=RiskCategory.PII,
                     confidence=0.8,
                     text=bare.group(0) if bare else None,
+                    trust="DATA",
                 )
             )
 
@@ -149,6 +196,7 @@ class OpticalAnalyzer:
                     category=RiskCategory.PII,
                     confidence=0.7,
                     text=match_text,
+                    trust="DATA",
                 )
             )
 
@@ -159,20 +207,19 @@ class OpticalAnalyzer:
                     category=RiskCategory.PII,
                     confidence=0.8,
                     text=m.group(0),
+                    trust="DATA",
                 )
             )
 
         mrn = _MRN_RE.search(text)
         if mrn:
-            # MRN / patient ID is both an identifier (sanitizable → PII rewrite
-            # path when alone) and clinical PHI. Emit PII for rewrite; PHI is
-            # added when other clinical signals are present (see below).
             findings.append(
                 OpticalFinding(
                     type="mrn",
                     category=RiskCategory.PII,
                     confidence=0.95,
                     text=mrn.group(0),
+                    trust="DATA",
                 )
             )
             findings.append(
@@ -181,6 +228,7 @@ class OpticalAnalyzer:
                     category=RiskCategory.PHI,
                     confidence=0.9,
                     text=mrn.group(0),
+                    trust="DATA",
                 )
             )
 
@@ -194,13 +242,14 @@ class OpticalAnalyzer:
                         category=RiskCategory.PHI,
                         confidence=0.75,
                         text=finding_type,
+                        trust="DATA",
                     )
                 )
 
-        document_type = _infer_document_type(findings, clinical_hits, injection_detected)
+        document_type = _infer_document_type(findings, clinical_hits, injection_detected, multimodal)
         confidence = ocr.confidence
         if findings:
-            confidence = max(confidence, max(f.confidence for f in findings))
+            confidence = max(confidence, max(f.confidence for f in findings), multimodal.confidence)
 
         return OpticalAssessment(
             ocr_text=text,
@@ -209,6 +258,13 @@ class OpticalAnalyzer:
             face_detected=False,
             injection_detected=injection_detected,
             confidence=confidence,
+            trust_classification="untrusted",
+            multimodal_categories=multimodal.categories,
+            rewrite_mode=multimodal.rewrite_mode,
+            qr_detected=multimodal.qr_detected,
+            qr_payload=multimodal.qr_payload,
+            authority_spoofing=multimodal.authority_spoofing,
+            data_exfiltration=multimodal.data_exfiltration,
         )
 
 
@@ -216,9 +272,14 @@ def _infer_document_type(
     findings: list[OpticalFinding],
     clinical_hits: int,
     injection_detected: bool,
+    multimodal,
 ) -> str | None:
-    if injection_detected:
+    if injection_detected or multimodal.injection_detected:
         return "injection_attempt"
+    if multimodal.phishing:
+        return "phishing_attempt"
+    if multimodal.qr_detected:
+        return "qr_code_document"
     types = {f.type for f in findings}
     if clinical_hits or "mrn" in types or "patient_id" in types:
         return "clinical_document"

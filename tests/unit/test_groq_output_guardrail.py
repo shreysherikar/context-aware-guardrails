@@ -25,12 +25,7 @@ from services.output_guardrail.groq_guardrail import (
     _output_assessment_schema,
 )
 
-OUTPUT_ASSESSMENT_FIELDS = [
-    "flagged",
-    "unverified_claims",
-    "reasoning",
-    "confidence",
-]
+OUTPUT_ASSESSMENT_FIELDS = list(OutputAssessment.model_fields.keys())
 
 
 def _guardrail(client) -> GroqOutputGuardrail:

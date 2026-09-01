@@ -11,6 +11,7 @@ LLM_GENERATION_PROVIDER values:
 - unset/empty (default) -> None: no generative LLM wired; ALLOW responses
   return a null response field.
 - "groq" -> GroqLLMGateway.
+- "ollama" -> OllamaLLMGateway (local Ollama at OLLAMA_BASE_URL).
 
 Unknown values fail loudly rather than silently disabling generation.
 """
@@ -31,4 +32,10 @@ def get_gateway() -> LLMGateway | None:
         from services.llm.groq_gateway import GroqLLMGateway
 
         return GroqLLMGateway()
-    raise ValueError(f"Unsupported LLM_GENERATION_PROVIDER={provider!r}; expected 'groq' or unset.")
+    if provider == "ollama":
+        from services.llm.ollama_gateway import OllamaLLMGateway
+
+        return OllamaLLMGateway()
+    raise ValueError(
+        f"Unsupported LLM_GENERATION_PROVIDER={provider!r}; expected 'groq', 'ollama', or unset."
+    )

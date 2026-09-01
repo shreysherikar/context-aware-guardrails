@@ -10,6 +10,7 @@ import pytest
 
 from services.llm.factory import get_gateway
 from services.llm.groq_gateway import GroqLLMGateway
+from services.llm.ollama_gateway import OllamaLLMGateway
 from services.risk_engine.classifier import KeywordMockClassifier
 from services.risk_engine.factory import get_classifier
 from services.risk_engine.groq_classifier import GroqRiskClassifier
@@ -35,6 +36,11 @@ def test_generation_provider_groq_builds_groq_gateway(monkeypatch):
     _use_groq_key(monkeypatch)
     monkeypatch.setenv("LLM_GENERATION_PROVIDER", "groq")
     assert isinstance(get_gateway(), GroqLLMGateway)
+
+
+def test_generation_provider_ollama_builds_ollama_gateway(monkeypatch):
+    monkeypatch.setenv("LLM_GENERATION_PROVIDER", "ollama")
+    assert isinstance(get_gateway(), OllamaLLMGateway)
 
 
 def test_generation_provider_unknown_fails_loudly(monkeypatch):

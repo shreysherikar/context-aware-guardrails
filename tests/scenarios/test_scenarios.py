@@ -79,7 +79,8 @@ def test_tc09_groq_classifier_timeout_fails_closed_end_to_end(monkeypatch):
     monkeypatch.setattr("apps.api.main.classifier", classifier)
 
     result = _evaluate("Summarize this internal document.", conv="tc09")
-    assert result["decision"]["action"] == "BLOCK"
+    assert result["decision"]["action"] == "REVIEW"
+    assert result["explanation"]["decision"] == "REVIEW"
     assert result["risk_assessment"]["risk_level"] == "CRITICAL"
 
 
@@ -102,5 +103,6 @@ def test_tc09_groq_classifier_malformed_output_fails_closed_end_to_end(monkeypat
     monkeypatch.setattr("apps.api.main.classifier", classifier)
 
     result = _evaluate("Summarize this internal document.", conv="tc09")
-    assert result["decision"]["action"] == "BLOCK"
+    assert result["decision"]["action"] == "REVIEW"
+    assert result["explanation"]["decision"] == "REVIEW"
     assert result["risk_assessment"]["risk_level"] == "CRITICAL"

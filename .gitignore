@@ -2,12 +2,15 @@ __pycache__/
 *.pyc
 .venv/
 .env
-audit.db
+*.db
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
 .DS_Store
+node_modules/
+.design-ref/
+*.blend1
 Context_Aware_AI_Guardrail_Proposal.md
 ARCHITECTURE.md
 AGENTS.md

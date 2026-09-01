@@ -16,6 +16,7 @@ class LLMRequest(BaseModel):
     """Minimal input the gateway needs to generate a response."""
 
     prompt: str
+    system_prompt: str | None = None
     # The downstream model has no context beyond the prompt in the current
     # implementation. Additional context (conversation history, retrieved
     # evidence) is a separate future decision.

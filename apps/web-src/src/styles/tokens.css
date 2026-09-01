@@ -1,0 +1,230 @@
+/* ContextGuard — neutral + single accent design tokens (light + dark) */
+
+:root {
+  color-scheme: light;
+
+  --bg-page: #fafaf9;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #f2f2f0;
+  --border: #e5e4e0;
+  --border-strong: #d4d3ce;
+
+  --text-primary: #1a1a18;
+  --text-secondary: #6b6a64;
+  --text-muted: #9c9b95;
+  --text-on-accent: #ffffff;
+
+  --accent: #3b6fe0;
+  --accent-hover: #2f5bc4;
+  --accent-active: #274ca3;
+  --accent-bg: #eaf0fd;
+  --accent-text: #1f4fb0;
+
+  --success: #1d9e75;
+  --success-bg: #e1f5ee;
+  --warning: #ba7517;
+  --warning-bg: #faeeda;
+  --danger: #a32d2d;
+  --danger-bg: #fcebeb;
+
+  --muted: var(--text-muted);
+  --text: var(--text-primary);
+  --bg: var(--bg-page);
+  --panel: var(--bg-surface);
+  --line: var(--border);
+
+  --rail-bg: var(--bg-surface);
+  --rail-border: var(--border);
+  --rail-fg: var(--text-secondary);
+  --rail-fg-active: var(--text-primary);
+  --rail-hover: var(--bg-surface-2);
+  --rail-active-bg: var(--accent-bg);
+
+  --ok-fg: var(--success);
+  --ok-bg: var(--success-bg);
+  --ok-line: color-mix(in srgb, var(--success) 30%, var(--border));
+  --rewrite-fg: var(--warning);
+  --rewrite-bg: var(--warning-bg);
+  --rewrite-line: color-mix(in srgb, var(--warning) 30%, var(--border));
+  --clarify-fg: var(--warning);
+  --clarify-bg: var(--warning-bg);
+  --clarify-line: color-mix(in srgb, var(--warning) 25%, var(--border));
+  --review-fg: var(--danger);
+  --review-bg: var(--danger-bg);
+  --review-line: color-mix(in srgb, var(--danger) 25%, var(--border));
+  --block-fg: var(--danger);
+  --block-bg: var(--danger-bg);
+  --block-line: color-mix(in srgb, var(--danger) 30%, var(--border));
+
+  --risk-none: var(--text-muted);
+  --risk-low: var(--success);
+  --risk-medium: var(--warning);
+  --risk-high: var(--warning);
+  --risk-critical: var(--danger);
+
+  --flow-edge: var(--border-strong);
+  --flow-edge-active: var(--accent);
+
+  --login-brand-gradient: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--accent) 85%, #1a1a18) 0%,
+    color-mix(in srgb, var(--accent-active) 90%, #1a1a18) 100%
+  );
+  --login-brand-fg: #ffffff;
+  --login-brand-fg-muted: rgba(255, 255, 255, 0.35);
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-pill: 999px;
+  --space: 4px;
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --focus-ring: 0 0 0 3px var(--accent-bg);
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --content-max: 880px;
+  --rail-w: 240px;
+  --transition: 0.15s ease;
+  --code-bg: var(--bg-surface-2);
+  --raw-json-bg: #1a1a18;
+  --raw-json-fg: #d4d3ce;
+  --hover-overlay: rgba(0, 0, 0, 0.03);
+  --chat-user-bg: var(--accent);
+  --chat-user-fg: var(--text-on-accent);
+  --chat-user-border: var(--border);
+  --chat-assistant-bg: var(--bg-surface);
+  --chat-assistant-fg: var(--text-primary);
+  --chat-assistant-border: var(--border);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg-page: #060608;
+  --bg-surface: #0c0c0f;
+  --bg-surface-2: #141418;
+  --border: #1f1f24;
+  --border-strong: #2c2c33;
+
+  --text-primary: #f5f5f3;
+  --text-secondary: #b9b8b3;
+  --text-muted: #73726c;
+  --text-on-accent: #ffffff;
+
+  --accent: #5c8af0;
+  --accent-hover: #7099f4;
+  --accent-active: #4a76d6;
+  --accent-bg: #121a2a;
+  --accent-text: #a8c4f8;
+
+  --success: #34c08f;
+  --success-bg: #0d2419;
+  --warning: #e0a23d;
+  --warning-bg: #2a1f0c;
+  --danger: #e05c5c;
+  --danger-bg: #2a1212;
+
+  --chat-user-bg: #2a2a32;
+  --chat-user-fg: #f2f2f0;
+  --chat-user-border: #36363f;
+  --chat-assistant-bg: #141418;
+  --chat-assistant-fg: #ececea;
+  --chat-assistant-border: #222228;
+
+  --rail-bg: var(--bg-surface);
+  --rail-border: var(--border);
+  --rail-fg: var(--text-secondary);
+  --rail-fg-active: var(--text-primary);
+  --rail-hover: var(--bg-surface-2);
+  --rail-active-bg: var(--accent-bg);
+
+  --flow-edge: var(--border-strong);
+  --flow-edge-active: var(--accent);
+
+  --login-brand-gradient: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--accent) 65%, #060608) 0%,
+    color-mix(in srgb, var(--accent-active) 70%, #060608) 100%
+  );
+  --login-brand-fg: #f5f5f3;
+  --login-brand-fg-muted: rgba(245, 245, 243, 0.35);
+
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --hover-overlay: rgba(255, 255, 255, 0.04);
+  --code-bg: var(--bg-surface-2);
+  --raw-json-bg: #08080a;
+  --raw-json-fg: #d0cfc9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --bg-page: #060608;
+    --bg-surface: #0c0c0f;
+    --bg-surface-2: #141418;
+    --border: #1f1f24;
+    --border-strong: #2c2c33;
+
+    --text-primary: #f5f5f3;
+    --text-secondary: #b9b8b3;
+    --text-muted: #73726c;
+    --text-on-accent: #ffffff;
+
+    --accent: #5c8af0;
+    --accent-hover: #7099f4;
+    --accent-active: #4a76d6;
+    --accent-bg: #121a2a;
+    --accent-text: #a8c4f8;
+
+    --success: #34c08f;
+    --success-bg: #0d2419;
+    --warning: #e0a23d;
+    --warning-bg: #2a1f0c;
+    --danger: #e05c5c;
+    --danger-bg: #2a1212;
+
+    --chat-user-bg: #2a2a32;
+    --chat-user-fg: #f2f2f0;
+    --chat-user-border: #36363f;
+    --chat-assistant-bg: #141418;
+    --chat-assistant-fg: #ececea;
+    --chat-assistant-border: #222228;
+
+    --rail-bg: var(--bg-surface);
+    --rail-hover: var(--bg-surface-2);
+    --rail-active-bg: var(--accent-bg);
+
+    --login-brand-gradient: linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--accent) 65%, #060608) 0%,
+      color-mix(in srgb, var(--accent-active) 70%, #060608) 100%
+    );
+    --login-brand-fg: #f5f5f3;
+    --login-brand-fg-muted: rgba(245, 245, 243, 0.35);
+
+    --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.45);
+    --hover-overlay: rgba(255, 255, 255, 0.04);
+    --raw-json-bg: #08080a;
+    --raw-json-fg: #d0cfc9;
+  }
+}
+
+* {
+  scrollbar-color: var(--border-strong) var(--bg-surface-2);
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: var(--bg-surface-2); }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+
+.decision-allow { color: var(--success); }
+.decision-block { color: var(--danger); }
+.decision-approval { color: var(--warning); }
+.decision-review { color: var(--accent-text); }
+.decision-restrict { color: var(--text-secondary); }
+
+.status-dot-complete { background: var(--success); }
+.status-dot-running { background: var(--accent); }
+.status-dot-pending { background: var(--warning); }
+.status-dot-idle { background: var(--text-muted); }
+.status-dot-error { background: var(--danger); }

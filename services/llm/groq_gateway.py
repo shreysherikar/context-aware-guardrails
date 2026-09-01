@@ -47,6 +47,7 @@ class GroqLLMGateway:
         )
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
+        system = request.system_prompt or _SYSTEM_PROMPT
         # NOTE: this uses the synchronous Groq client inside an async gateway
         # method, so each call briefly blocks the event loop. Acceptable at the
         # current scale; consider groq.AsyncGroq / non-blocking IO if concurrent
@@ -54,7 +55,7 @@ class GroqLLMGateway:
         response = self._client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": system},
                 {"role": "user", "content": request.prompt},
             ],
             temperature=0.0,

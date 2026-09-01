@@ -20,6 +20,7 @@ from domain.enums import (
     DataSensitivity,
     EvidenceRelationship,
     PolicyAction,
+    ResolutionType,
     RiskCategory,
     RiskLevel,
     VerificationStatus,
@@ -106,6 +107,9 @@ class OutputAssessment(BaseModel):
     unverified_claims: list[str] = Field(default_factory=list)
     reasoning: str = ""
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    safe_text: str | None = None
+    blocked: bool = False
+    rewrite_applied: bool = False
 
 
 class OutputGuardrailResult(BaseModel):
@@ -255,6 +259,8 @@ class OpticalFinding(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
     text: str | None = None
     bbox: list[float] | None = None
+    trust: str | None = None
+    threat_category: str | None = None
 
 
 class OpticalAssessment(BaseModel):
@@ -270,6 +276,13 @@ class OpticalAssessment(BaseModel):
     face_detected: bool = False
     injection_detected: bool = False
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    trust_classification: str = "untrusted"
+    multimodal_categories: list[str] = Field(default_factory=list)
+    rewrite_mode: str | None = None
+    qr_detected: bool = False
+    qr_payload: str | None = None
+    authority_spoofing: bool = False
+    data_exfiltration: bool = False
 
 
 class OpticalAuditMeta(BaseModel):
@@ -327,6 +340,40 @@ class ClaimVerificationMeta(BaseModel):
     failure_kind: str | None = None
 
 
+class ResolutionPath(BaseModel):
+    """One available resolution option for a guarded request."""
+
+    type: ResolutionType
+    title: str
+    message: str
+    primary: bool = False
+
+
+class LLMStatusStep(BaseModel):
+    """One step in the LLM forwarding status strip."""
+
+    label: str
+    status: str  # forwarded | not_forwarded | pending | completed | not_contacted
+
+
+class ExplainableDecision(BaseModel):
+    """User-facing safety decision — no internal guardrail implementation details."""
+
+    request_id: str
+    decision: PolicyAction
+    forwarded_to_llm: bool
+    category: str
+    reason: str
+    detected_elements: list[str] = Field(default_factory=list)
+    resolution_type: ResolutionType
+    resolution_message: str
+    safe_suggestions: list[str] = Field(default_factory=list)
+    available_resolutions: list[ResolutionPath] = Field(default_factory=list)
+    llm_status: list[LLMStatusStep] = Field(default_factory=list)
+    sanitized_prompt: str | None = None
+    original_prompt_protected: bool = False
+
+
 class AuditEvent(BaseModel):
     conversation_id: str
     prompt: str
@@ -339,4 +386,11 @@ class AuditEvent(BaseModel):
     optical: OpticalAuditMeta | None = None
     sanitization: SanitizationAuditMeta | None = None
     claim_verification: ClaimVerificationMeta | None = None
+    request_id: str = ""
+    resolution_type: str | None = None
+    forwarded_to_llm: bool = False
+    sanitization_occurred: bool = False
+    human_review_requested: bool = False
+    human_review_outcome: str | None = None
+    report_status: str | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

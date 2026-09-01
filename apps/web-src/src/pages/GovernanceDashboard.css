@@ -1,0 +1,210 @@
+.gov-dashboard {
+  padding: 1.5rem 2rem 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.gov-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.gov-eyebrow {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.gov-title {
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.gov-runtime-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-surface);
+}
+
+.gov-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.gov-dot.live {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 20%, transparent);
+}
+
+.gov-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 1rem;
+}
+
+.gov-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.gov-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.gov-stat-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.gov-stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.gov-stat--green .gov-stat-value { color: var(--success); }
+.gov-stat--red .gov-stat-value { color: var(--danger); }
+.gov-stat--amber .gov-stat-value { color: var(--warning); }
+
+.gov-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.gov-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  padding: 1rem 1.25rem;
+}
+
+.gov-panel.wide {
+  grid-column: 1 / -1;
+}
+
+.gov-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 0.875rem;
+  color: var(--text-primary);
+}
+
+.gov-category-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.375rem 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--bg-surface-2);
+  text-transform: capitalize;
+}
+
+.gov-count {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.gov-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.gov-approval-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--bg-surface-2);
+  font-size: 12px;
+}
+
+.gov-muted {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.gov-risk {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+}
+
+.gov-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.gov-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.gov-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--bg-surface-2);
+}
+
+.gov-decision {
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.gov-event-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--bg-surface-2);
+  font-size: 12px;
+}
+
+.gov-sev {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.gov-sev--critical { background: var(--danger-bg); color: var(--danger); }
+.gov-sev--high { background: var(--warning-bg); color: var(--warning); }
+.gov-sev--medium { background: var(--warning-bg); color: var(--warning); }
+.gov-sev--low { background: var(--bg-surface-2); color: var(--text-secondary); }
+
+@media (max-width: 768px) {
+  .gov-grid { grid-template-columns: 1fr; }
+}

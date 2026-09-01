@@ -36,6 +36,14 @@ _FORMAT_TO_MIME = {
     "WEBP": "image/webp",
 }
 
+_CHAT_FORMAT_TO_MIME = {
+    **_FORMAT_TO_MIME,
+    "GIF": "image/gif",
+    "BMP": "image/bmp",
+    "TIFF": "image/tiff",
+    "MPO": "image/jpeg",
+}
+
 DEFAULT_MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
@@ -115,5 +123,40 @@ def validate_image(
             allowed_formats = _MIME_TO_FORMATS.get(normalized, set())
             if fmt not in allowed_formats:
                 raise ImageValidationError("Image content does not match the declared type.")
+
+    return ValidatedImage(data=data, content_type=content_type, size=len(data))
+
+
+def validate_chat_image(
+    data: bytes,
+    *,
+    declared_content_type: str | None = None,
+) -> ValidatedImage:
+    """Permissive image validation for chat uploads (any Pillow-decodable raster)."""
+    if not data:
+        raise ImageValidationError("The uploaded image is empty.")
+
+    max_bytes = _max_bytes()
+    if len(data) > max_bytes:
+        raise ImageValidationError("The uploaded image exceeds the maximum allowed size.")
+
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img.verify()
+        with Image.open(io.BytesIO(data)) as img:
+            fmt = (img.format or "").upper()
+    except UnidentifiedImageError as exc:
+        raise ImageValidationError("The uploaded file is not a valid image.") from exc
+    except OSError as exc:
+        raise ImageValidationError("The uploaded file is not a valid image.") from exc
+
+    content_type = _CHAT_FORMAT_TO_MIME.get(fmt)
+    if not content_type:
+        raise ImageValidationError("Unsupported image format.")
+
+    if declared_content_type:
+        normalized = declared_content_type.split(";")[0].strip().lower()
+        if normalized and normalized != content_type and normalized not in ALLOWED_MIME_TYPES:
+            pass  # trust detected format for chat uploads
 
     return ValidatedImage(data=data, content_type=content_type, size=len(data))

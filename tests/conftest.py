@@ -36,6 +36,7 @@ os.environ.setdefault("LLM_GENERATION_PROVIDER", "")
 os.environ.setdefault("OUTPUT_GUARDRAIL_PROVIDER", "")
 os.environ.setdefault("CLAIM_VERIFICATION_PROVIDER", "")
 os.environ.setdefault("OPTICAL_OCR_PROVIDER", "mock")
+os.environ.setdefault("AGENT_LLM_FEEDBACK", "false")
 
 # Auth bootstrap: dev mode off (safe default), test signing secret on. Forced
 # (not setdefault) for DEV_MODE so a local .env cannot flip it on and change

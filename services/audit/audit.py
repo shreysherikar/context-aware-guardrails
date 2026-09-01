@@ -37,7 +37,21 @@ _COLUMNS_TO_MIGRATE: list[tuple[str, str]] = [
     ("optical", "TEXT"),
     ("sanitization", "TEXT"),
     ("claim_verification", "TEXT"),
+    ("request_id", "TEXT"),
+    ("resolution_type", "TEXT"),
+    ("forwarded_to_llm", "INTEGER"),
+    ("sanitization_occurred", "INTEGER"),
+    ("human_review_requested", "INTEGER"),
+    ("human_review_outcome", "TEXT"),
+    ("report_status", "TEXT"),
 ]
+
+_AUDIT_SELECT = """SELECT conversation_id, prompt, user_role, risk_assessment,
+                   policy_decision, llm, output_guardrail, optical, sanitization,
+                   claim_verification, request_id, resolution_type, forwarded_to_llm,
+                   sanitization_occurred, human_review_requested, human_review_outcome,
+                   report_status, timestamp
+                   FROM audit_log"""
 
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
@@ -73,6 +87,13 @@ def _get_conn() -> sqlite3.Connection:
             optical TEXT,
             sanitization TEXT,
             claim_verification TEXT,
+            request_id TEXT,
+            resolution_type TEXT,
+            forwarded_to_llm INTEGER,
+            sanitization_occurred INTEGER,
+            human_review_requested INTEGER,
+            human_review_outcome TEXT,
+            report_status TEXT,
             timestamp TEXT NOT NULL
         )
         """
@@ -88,8 +109,10 @@ def log_event(event: AuditEvent) -> None:
             """INSERT INTO audit_log
                (conversation_id, prompt, user_role, risk_assessment,
                 policy_decision, llm, output_guardrail, optical, sanitization,
-                claim_verification, timestamp)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                claim_verification, request_id, resolution_type, forwarded_to_llm,
+                sanitization_occurred, human_review_requested, human_review_outcome,
+                report_status, timestamp)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 event.conversation_id,
                 event.prompt,
@@ -101,6 +124,13 @@ def log_event(event: AuditEvent) -> None:
                 event.optical.model_dump_json() if event.optical else None,
                 event.sanitization.model_dump_json() if event.sanitization else None,
                 event.claim_verification.model_dump_json() if event.claim_verification else None,
+                event.request_id or None,
+                event.resolution_type,
+                1 if event.forwarded_to_llm else 0,
+                1 if event.sanitization_occurred else 0,
+                1 if event.human_review_requested else 0,
+                event.human_review_outcome,
+                event.report_status,
                 event.timestamp.isoformat(),
             ),
         )
@@ -110,7 +140,7 @@ def log_event(event: AuditEvent) -> None:
 
 
 def _row_to_audit_event(row: tuple) -> AuditEvent:
-    """Deserialize one audit_log row into an AuditEvent (restoring domain types)."""
+    """Deserialize one audit_log row into an AuditEvent."""
     (
         conversation_id,
         prompt,
@@ -122,6 +152,13 @@ def _row_to_audit_event(row: tuple) -> AuditEvent:
         optical_json,
         sanitization_json,
         claim_verification_json,
+        request_id,
+        resolution_type,
+        forwarded_to_llm,
+        sanitization_occurred,
+        human_review_requested,
+        human_review_outcome,
+        report_status,
         timestamp,
     ) = row
     return AuditEvent(
@@ -141,6 +178,13 @@ def _row_to_audit_event(row: tuple) -> AuditEvent:
         claim_verification=ClaimVerificationMeta.model_validate_json(claim_verification_json)
         if claim_verification_json
         else None,
+        request_id=request_id or "",
+        resolution_type=resolution_type,
+        forwarded_to_llm=bool(forwarded_to_llm),
+        sanitization_occurred=bool(sanitization_occurred),
+        human_review_requested=bool(human_review_requested),
+        human_review_outcome=human_review_outcome,
+        report_status=report_status,
         timestamp=datetime.fromisoformat(timestamp),
     )
 
@@ -160,10 +204,7 @@ def get_recent_events(conversation_id: str, limit: int = 10) -> list[AuditEvent]
     conn = _get_conn()
     try:
         rows = conn.execute(
-            """SELECT conversation_id, prompt, user_role, risk_assessment,
-               policy_decision, llm, output_guardrail, optical, sanitization,
-               claim_verification, timestamp
-               FROM audit_log
+            f"""{_AUDIT_SELECT}
                WHERE conversation_id = ?
                ORDER BY id DESC
                LIMIT ?""",
@@ -171,5 +212,29 @@ def get_recent_events(conversation_id: str, limit: int = 10) -> list[AuditEvent]
         ).fetchall()
     finally:
         conn.close()
-    # SQL returns newest-first; hand callers chronological order.
     return [_row_to_audit_event(row) for row in reversed(rows)]
+
+
+def list_events(conversation_id: str | None = None, limit: int = 50) -> list[AuditEvent]:
+    """Read-only listing for the audit viewer UI. Newest first."""
+    limit = max(1, min(limit, 200))
+    conn = _get_conn()
+    try:
+        if conversation_id is not None:
+            rows = conn.execute(
+                f"""{_AUDIT_SELECT}
+                   WHERE conversation_id = ?
+                   ORDER BY id DESC
+                   LIMIT ?""",
+                (conversation_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"""{_AUDIT_SELECT}
+                   ORDER BY id DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+    finally:
+        conn.close()
+    return [_row_to_audit_event(row) for row in rows]

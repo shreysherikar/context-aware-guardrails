@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1f3a" />
+  <title>FieldAssist — ContextGuard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --canvas: #f3f6fb; --rail: #0b1f3a; --surface: #fff; --elevated: #f8fafc;
+      --line: #e2e8f0; --text: #0f172a; --text-2: #475569; --muted: #94a3b8;
+      --blue: #2563eb; --blue-deep: #1d4ed8; --navy: #0b1f3a;
+      --warn-bg: #fff7ed; --warn-line: #fed7aa;
+      --font: 'Manrope', system-ui, sans-serif;
+      --shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 28px rgba(15,23,42,.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      height: 100vh; display: grid; grid-template-columns: 220px 1fr;
+      font: 14.5px/1.55 var(--font); color: var(--text); background: var(--canvas);
+      -webkit-font-smoothing: antialiased;
+    }
+    .rail {
+      background: linear-gradient(180deg, var(--rail), #081628);
+      color: #e2e8f0; padding: 22px 16px; display: flex; flex-direction: column; gap: 18px;
+    }
+    .rail-brand { display: flex; align-items: center; gap: 12px; padding: 4px 6px 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .logo {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(145deg, #1e40af, #3b82f6);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; color: #fff; box-shadow: 0 8px 20px rgba(37,99,235,.35);
+    }
+    .rail-name { font-weight: 800; color: #fff; letter-spacing: -0.03em; }
+    .rail-sub { font-size: 0.68rem; color: #93a4c3; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
+    .rail a {
+      display: block; color: #a8b8d4; text-decoration: none; font-weight: 700; font-size: 0.86rem;
+      padding: 12px; border-radius: 12px; transition: .18s ease;
+    }
+    .rail a:hover, .rail a.active { background: rgba(37,99,235,.28); color: #fff; }
+    .rail-note { margin-top: auto; font-size: 0.74rem; color: #7f93b5; line-height: 1.4; padding: 0 6px; }
+    .workspace { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+    .top {
+      padding: 24px 28px 12px; display: flex; justify-content: space-between; align-items: flex-end;
+      background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(243,246,251,0));
+    }
+    .top h1 { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.04em; color: var(--navy); }
+    .top p { font-size: 0.72rem; font-weight: 700; color: var(--blue); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+    .chat-wrap { flex: 1; display: flex; flex-direction: column; max-width: 860px; width: 100%; margin: 0 auto; min-height: 0; padding: 0 16px; }
+    .messages { flex: 1; overflow-y: auto; padding: 1rem 0.5rem 1.25rem; display: flex; flex-direction: column; gap: 0.8rem; }
+    .bubble { max-width: 88%; padding: 0.9rem 1.1rem; border-radius: 18px; line-height: 1.55; font-size: 0.95rem; white-space: pre-wrap; }
+    .bubble.user {
+      align-self: flex-end; color: #fff; border-bottom-right-radius: 5px;
+      background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+      box-shadow: 0 8px 18px rgba(37,99,235,.28);
+    }
+    .bubble.agent {
+      align-self: flex-start; background: #fff; border: 1px solid var(--line);
+      border-bottom-left-radius: 5px; box-shadow: var(--shadow);
+    }
+    .bubble.warn { background: var(--warn-bg); border-color: var(--warn-line); }
+    .composer {
+      background: #fff; border: 1px solid var(--line); border-radius: 20px 20px 0 0;
+      padding: 1rem; box-shadow: var(--shadow); margin-top: auto;
+    }
+    .starters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+    .starters button {
+      background: #eff6ff; color: var(--blue-deep); border: 1px solid #bfdbfe;
+      border-radius: 999px; padding: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .starters button:hover { background: #dbeafe; }
+    .input-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .web-toggle { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
+    textarea {
+      flex: 1; min-height: 48px; max-height: 120px; resize: none;
+      border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem 0.9rem;
+      font: inherit; background: var(--elevated); outline: none;
+    }
+    textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,99,235,.16); background: #fff; }
+    .send, .attach {
+      width: 44px; height: 44px; border-radius: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    }
+    .send { background: linear-gradient(180deg, #3b82f6, #1d4ed8); color: #fff; border: none; box-shadow: 0 8px 18px rgba(37,99,235,.28); }
+    .send:disabled { opacity: .35; }
+    .attach { background: #fff; color: var(--text-2); border: 1px solid var(--line); }
+    .meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.55rem; font-weight: 600; }
+    .details { margin-top: .5rem; padding: .75rem; background: var(--elevated); border: 1px solid var(--line); border-radius: 10px; font-size: .8rem; color: var(--text-2); display: none; }
+    .details.open { display: block; }
+    .details-toggle { font-size: .75rem; color: var(--blue); cursor: pointer; margin-top: .35rem; font-weight: 800; }
+    .typing { color: var(--muted); font-style: italic; font-size: .9rem; padding: .5rem 0; }
+    input[type="file"] { display: none; }
+    a { color: var(--blue); }
+    @media (max-width: 800px) {
+      body { grid-template-columns: 1fr; }
+      .rail { flex-direction: row; flex-wrap: wrap; align-items: center; height: auto; }
+      .rail-note { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="rail">
+    <div class="rail-brand">
+      <div class="logo">FA</div>
+      <div>
+        <div class="rail-name">FieldAssist</div>
+        <div class="rail-sub">Compliant chat</div>
+      </div>
+    </div>
+    <a class="active" href="/agent">Assistant</a>
+    <a href="/">Guardrail console</a>
+    <a href="/demo">Quick demo</a>
+    <p class="rail-note">Policy checks run silently. You’ll only see friction when a request needs a safer rewrite.</p>
+  </aside>
+
+  <div class="workspace">
+    <div class="top">
+      <div>
+        <p>Internal assistant</p>
+        <h1>Conversation</h1>
+      </div>
+    </div>
+    <div class="chat-wrap">
+      <div class="messages" id="messages">
+        <div class="bubble agent">Hello! I can help you draft compliant HCP outreach, summarize aggregate engagement data, or review messaging against our policies.
+
+Try asking about campaign KPIs, follow-up templates, or approved-material summaries. If something in your request needs adjustment, I'll explain what to change.</div>
+      </div>
+      <div class="composer">
+        <div class="starters">
+          <button type="button" data-prompt="Using our CRM in aggregate, summarize engagement performance by region and channel. Do not include individual HCP identifiers.">Engagement summary</button>
+          <button type="button" data-prompt="Draft a neutral follow-up email template after a call: agenda recap and request for next meeting time, using only non-identifying details.">Follow-up template</button>
+          <button type="button" data-prompt="Write an outreach message that will increase prescriptions for Drug X.">Risky example</button>
+          <button type="button" data-prompt="Create an HCP education summary for off-label use of Drug X based on recent studies.">Off-label example</button>
+          <button type="button" data-sample="patient_card.png">Upload patient card image</button>
+          <button type="button" data-prompt="Search the web for latest FDA guidance on AI in pharma marketing.">Web search example</button>
+        </div>
+        <div class="input-row">
+          <label class="web-toggle"><input type="checkbox" id="webSearch" checked /> Search web</label>
+          <button class="attach" id="attach" title="Attach image">📎</button>
+          <input type="file" id="image" accept="image/png,image/jpeg,image/webp" />
+          <textarea id="input" rows="1" placeholder="Ask FieldAssist anything..."></textarea>
+          <button class="send" id="send">↑</button>
+        </div>
+        <div class="meta" id="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("input");
+    const send = document.getElementById("send");
+    const status = document.getElementById("status");
+    const imageInput = document.getElementById("image");
+    const attach = document.getElementById("attach");
+    const webSearchEl = document.getElementById("webSearch");
+    const convId = "fa-" + Date.now();
+    let pendingSample = null;
+    let typingEl = null;
+
+    attach.addEventListener("click", () => imageInput.click());
+    document.querySelectorAll("[data-prompt]").forEach((b) => {
+      b.addEventListener("click", () => { input.value = b.dataset.prompt; pendingSample = null; input.focus(); });
+    });
+    document.querySelectorAll("[data-sample]").forEach((b) => {
+      b.addEventListener("click", () => { pendingSample = b.dataset.sample; status.textContent = "Image sample ready — press send"; });
+    });
+
+    function addBubble(text, who, extra) {
+      const wrap = document.createElement("div");
+      wrap.style.alignSelf = who === "user" ? "flex-end" : "flex-start";
+      wrap.style.maxWidth = "88%";
+      const div = document.createElement("div");
+      div.className = "bubble " + who + (extra && extra.warn ? " warn" : "");
+      div.textContent = text;
+      wrap.appendChild(div);
+      if (extra && (extra.issues?.length || extra.suggested_rewrite || extra.web_sources?.length || extra.active_agents?.length)) {
+        const toggle = document.createElement("div");
+        toggle.className = "details-toggle";
+        toggle.textContent = (extra.web_sources?.length || extra.active_agents?.length) ? "Agents & details" : "Why was this flagged?";
+        const details = document.createElement("div");
+        details.className = "details";
+        let html = "";
+        if (extra.active_agents?.length) {
+          html += "<strong>Active agents:</strong><ul>";
+          extra.active_agents.forEach((a) => {
+            html += "<li>" + a.name + (a.role === "guard" ? " (guard)" : a.role === "enrichment" ? " (enrichment)" : "") + "</li>";
+          });
+          html += "</ul>";
+        }
+        if (extra.primary_agent) html += "<strong>Lead agent:</strong> " + extra.primary_agent + "<br>";
+        if (extra.prompt_class) html += "<strong>Classification:</strong> " + extra.prompt_class + "<br>";
+        if (extra.issues?.length) {
+          html += "<strong>Issues:</strong><ul>";
+          extra.issues.forEach((i) => { html += "<li>" + i.title + "</li>"; });
+          html += "</ul>";
+        }
+        if (extra.suggested_rewrite) html += "<strong>Safer version:</strong><br><em>" + extra.suggested_rewrite + "</em>";
+        if (extra.web_sources?.length) {
+          html += "<strong>Web sources:</strong><ul>";
+          extra.web_sources.forEach((s) => {
+            html += "<li><a href=\"" + s.url + "\" target=\"_blank\" rel=\"noopener\">" + s.title + "</a></li>";
+          });
+          html += "</ul>";
+        }
+        details.innerHTML = html;
+        toggle.addEventListener("click", () => details.classList.toggle("open"));
+        wrap.appendChild(toggle);
+        wrap.appendChild(details);
+      }
+      messages.appendChild(wrap);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function showTyping() {
+      typingEl = document.createElement("div");
+      typingEl.className = "typing";
+      typingEl.textContent = "FieldAssist is thinking...";
+      messages.appendChild(typingEl);
+      messages.scrollTop = messages.scrollHeight;
+    }
+    function hideTyping() { if (typingEl) { typingEl.remove(); typingEl = null; } }
+
+    async function getToken() {
+      const r = await fetch("/auth/dev-token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "researcher" }) });
+      if (!r.ok) throw new Error("Auth not configured");
+      return (await r.json()).token;
+    }
+
+    async function doSend() {
+      const text = input.value.trim();
+      const file = imageInput.files[0];
+      if (!text && !file && !pendingSample) return;
+      send.disabled = true;
+      status.textContent = "FieldAssist is thinking (first reply may take ~30s)...";
+      if (text) addBubble(text, "user");
+      const sentText = text;
+      input.value = "";
+      showTyping();
+      const timer = setTimeout(() => {
+        status.textContent = "Still working — local AI can take up to 2 minutes on first load...";
+      }, 15000);
+      try {
+        const token = await getToken();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 180000);
+        let res, data;
+        if (file || pendingSample) {
+          const form = new FormData();
+          if (file) form.append("image", file);
+          else {
+            const img = await fetch("/demo/samples/" + pendingSample);
+            form.append("image", await img.blob(), pendingSample);
+          }
+          form.append("conversation_id", convId);
+          res = await fetch("/agent/chat-image", {
+            method: "POST", headers: { Authorization: "Bearer " + token }, body: form, signal: controller.signal,
+          });
+        } else {
+          res = await fetch("/agent/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+            body: JSON.stringify({ message: sentText, conversation_id: convId, use_web_search: webSearchEl.checked }),
+            signal: controller.signal,
+          });
+        }
+        clearTimeout(timeout);
+        data = await res.json();
+        hideTyping();
+        if (!res.ok) throw new Error(data.detail || "Request failed");
+        const reply = data.guardrail_triggered
+          ? ((data.message && data.message.trim()) || "")
+          : ((data.answer && data.answer.trim()) || (data.message && data.message.trim()) || "No response received.");
+        addBubble(reply, "agent", {
+          warn: data.guardrail_triggered,
+          issues: data.guardrail_triggered ? data.issues : [],
+          suggested_rewrite: data.suggested_rewrite,
+          prompt_class: data.prompt_class,
+          web_sources: data.web_sources,
+          active_agents: data.active_agents,
+          primary_agent: data.primary_agent,
+        });
+        const agentNames = (data.active_agents || []).filter((a) => a.role !== "guard").map((a) => a.name).join(", ");
+        status.textContent = data.web_search_used
+          ? "Answered using web search" + (agentNames ? " · " + agentNames : "")
+          : agentNames ? "Agents: " + agentNames : (data.action === "ALLOW" ? "" : "Prompt class: " + (data.prompt_class || data.action));
+        imageInput.value = "";
+        pendingSample = null;
+      } catch (e) {
+        hideTyping();
+        const msg = e.name === "AbortError"
+          ? "Request timed out. Make sure Ollama is running (ollama serve) and try again."
+          : e.message;
+        addBubble("Sorry, something went wrong. " + msg, "agent", { warn: true });
+        status.textContent = "";
+      } finally {
+        clearTimeout(timer);
+        send.disabled = false;
+      }
+    }
+
+    send.addEventListener("click", doSend);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); }
+    });
+  </script>
+</body>
+</html>

@@ -17,11 +17,59 @@ rules:
     injection_detected: true
     action: BLOCK
 
+  - id: DARKWEB-CRITICAL-001
+    description: "Critical dark-web access, bypass, or data exfiltration attempt."
+    category: CYBER_SAFETY
+    risk_level: CRITICAL
+    action: BLOCK
+
+  - id: DARKWEB-HIGH-001
+    description: "Actionable dark-web access guidance — block."
+    category: CYBER_SAFETY
+    risk_level: HIGH
+    action: BLOCK
+
+  - id: DARKWEB-MEDIUM-001
+    description: "Dark-web topic with operational hints — rewrite."
+    category: CYBER_SAFETY
+    risk_level: MEDIUM
+    action: REWRITE
+
+  - id: OPT-EXFIL-001
+    description: "Image instructing sensitive data exfiltration — block."
+    input_types: [image]
+    category: DATA_EXFILTRATION
+    action: BLOCK
+
+  - id: OPT-MALWARE-001
+    description: "Malware or code execution instructions in image — block."
+    input_types: [image]
+    category: MALWARE
+    action: BLOCK
+
+  - id: OPT-PHISHING-001
+    description: "Phishing or social engineering in image — block."
+    input_types: [image]
+    category: PHISHING
+    action: BLOCK
+
   - id: OPT-INJECTION-001
     description: "Visual/OCR prompt injection detected — block."
     input_types: [image]
     injection_detected: true
     action: BLOCK
+
+  - id: OPT-AUTHORITY-001
+    description: "Fake authority or approval claim in image — sanitize."
+    input_types: [image]
+    category: AUTHORITY_SPOOFING
+    action: REWRITE
+
+  - id: OPT-MULTIMODAL-001
+    description: "Untrusted multimodal operational content — sanitize."
+    input_types: [image]
+    category: MULTIMODAL_UNTRUSTED
+    action: REWRITE
 
   - id: OPT-PII-REWRITE-001
     description: "Identifiable data in image OCR — sanitize before any generation."

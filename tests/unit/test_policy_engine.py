@@ -91,7 +91,7 @@ def test_fails_closed_when_no_rule_matches():
     """A risk profile no rule anticipates must never default to ALLOW."""
     risk = RiskAssessment(risk_level=RiskLevel.MEDIUM, categories=[RiskCategory.NONE])
     decision = engine.evaluate(risk, "researcher")
-    assert decision.action == PolicyAction.BLOCK
+    assert decision.action == PolicyAction.REVIEW
     assert decision.policy_id == "DEFAULT-FAIL-CLOSED"
 
 

@@ -5,7 +5,7 @@ This is the only module allowed to produce a PolicyDecision. It reads
 version-controlled rules from policies/policy.yaml, validates them up front
 (see policy_models.py) and does pure rule lookup — no LLM call happens here,
 ever. On any error (unmatched risk profile, unexpected evaluation failure) it
-fails CLOSED to BLOCK, never open to ALLOW.
+fails CLOSED to REVIEW, never open to ALLOW.
 
 The policy path comes from the POLICY_PATH environment variable, falling back
 to the repository default, so the deployed configuration is explicit rather
@@ -90,18 +90,18 @@ class PolicyEngine:
                     )
             # No rule matched this risk profile at all -> fail closed.
             return PolicyDecision(
-                action=PolicyAction.BLOCK,
+                action=PolicyAction.REVIEW,
                 policy_id="DEFAULT-FAIL-CLOSED",
                 policy_version=version,
-                reasons=["No policy rule matched this risk profile; defaulting to BLOCK."],
+                reasons=["No policy rule matched this risk profile; routing to human review."],
             )
         except Exception:  # noqa: BLE001 - fail closed on ANY evaluation error
-            logger.exception("Unexpected policy evaluation error; failing closed to BLOCK")
+            logger.exception("Unexpected policy evaluation error; failing closed to REVIEW")
             return PolicyDecision(
-                action=PolicyAction.BLOCK,
+                action=PolicyAction.REVIEW,
                 policy_id="ERROR-FAIL-CLOSED",
                 policy_version=version,
-                reasons=["Unexpected policy evaluation error; defaulting to BLOCK."],
+                reasons=["Unexpected policy evaluation error; routing to human review."],
             )
 
     @staticmethod
