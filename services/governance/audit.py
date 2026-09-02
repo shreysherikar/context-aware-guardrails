@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import sqlite3
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 from domain.governance_models import GovernanceAuditRecord

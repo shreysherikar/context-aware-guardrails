@@ -18,9 +18,9 @@ from domain.governance_models import (
     GovernedRequest,
     SafeRewriteResult,
 )
+from services.cyber_safety.darkweb import assess_darkweb_content, extract_text_for_assessment
 from services.governance.computer_use.action_log import ComputerActionLogStore
 from services.governance.computer_use.environments import get_environment
-from services.cyber_safety.darkweb import assess_darkweb_content, extract_text_for_assessment
 from services.governance.computer_use.sandbox import ComputerSandbox
 from services.governance.computer_use.sessions import ComputerSessionStore
 from services.governance.kill_switch import KillSwitch, get_kill_switch
@@ -32,7 +32,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_SCREEN_CONTENT_KEYS = ("screen_text", "ocr_text", "vision_text", "screenshot_text", "text", "content")
+_SCREEN_CONTENT_KEYS = (
+    "screen_text",
+    "ocr_text",
+    "vision_text",
+    "screenshot_text",
+    "text",
+    "content",
+)
 
 
 def _extract_screen_content(arguments: dict, *, purpose: str = "") -> str:
@@ -45,6 +52,7 @@ def _extract_screen_content(arguments: dict, *, purpose: str = "") -> str:
     if not parts and purpose.strip():
         parts.append(purpose)
     return " ".join(parts)
+
 
 COMPUTER_ACTION_RISK: dict[str, RiskLevel] = {
     ComputerPermission.COMPUTER_VIEW_SCREEN.value: RiskLevel.LOW,
@@ -178,38 +186,48 @@ class ComputerUseEngine:
         allowed, reason = self._kill_switch.check()
         if not allowed:
             return _finish(
-                self._blocked(session_id, request_id, action, target, reason or "EMERGENCY_STOP", risk)
+                self._blocked(
+                    session_id, request_id, action, target, reason or "EMERGENCY_STOP", risk
+                )
             )
 
         session = self._sessions.get(session_id)
         if session is None:
             return _finish(
-                self._blocked(session_id, request_id, action, target, "Session expired or not found", risk)
+                self._blocked(
+                    session_id, request_id, action, target, "Session expired or not found", risk
+                )
             )
 
         if session.agent_id != agent.agent_id:
             return _finish(
-                self._blocked(session_id, request_id, action, target, "Session agent mismatch", risk)
+                self._blocked(
+                    session_id, request_id, action, target, "Session agent mismatch", risk
+                )
             )
 
         # Rate limiting
         if not self._check_rate_limit(session_id):
             return _finish(
-                self._blocked(session_id, request_id, action, target, "Session rate limit exceeded", risk)
+                self._blocked(
+                    session_id, request_id, action, target, "Session rate limit exceeded", risk
+                )
             )
 
         if rewrite_result and rewrite_result.blocked:
             self._sessions.update_state(session_id, actions_blocked=session.actions_blocked + 1)
-            return _finish(ComputerActionResult(
-                session_id=session_id,
-                request_id=request_id,
-                action=action,
-                target=target,
-                decision=GovernanceDecision.BLOCK,
-                risk_level=risk,
-                reason="Safe rewrite blocked action arguments",
-                rewrite_result=rewrite_result,
-            ))
+            return _finish(
+                ComputerActionResult(
+                    session_id=session_id,
+                    request_id=request_id,
+                    action=action,
+                    target=target,
+                    decision=GovernanceDecision.BLOCK,
+                    risk_level=risk,
+                    reason="Safe rewrite blocked action arguments",
+                    rewrite_result=rewrite_result,
+                )
+            )
 
         # Multimodal screen-content check (visual instructions only — not action payloads)
         screen_text = _extract_screen_content(
@@ -217,6 +235,7 @@ class ComputerUseEngine:
             purpose=governed.purpose or "",
         )
         from services.multimodal.classifier import assess_multimodal_content
+
         if screen_text.strip():
             screen_mm = assess_multimodal_content(
                 screen_text,
@@ -238,10 +257,16 @@ class ComputerUseEngine:
                         policy_decision=GovernanceDecision.BLOCK,
                         evidence={"session_id": session_id},
                     )
-                return _finish(self._blocked(
-                    session_id, request_id, action, target,
-                    "Multimodal screen content blocked — visual instructions are untrusted", risk,
-                ))
+                return _finish(
+                    self._blocked(
+                        session_id,
+                        request_id,
+                        action,
+                        target,
+                        "Multimodal screen content blocked — visual instructions are untrusted",
+                        risk,
+                    )
+                )
 
         cu_text = extract_text_for_assessment(
             governed.arguments,
@@ -268,39 +293,61 @@ class ComputerUseEngine:
                     policy_decision=GovernanceDecision.BLOCK,
                     evidence={"session_id": session_id, "target": target},
                 )
-            return _finish(self._blocked(
-                session_id, request_id, action, target,
-                "DARKWEB_ACCESS_PREVENTION: computer action blocked", risk,
-            ))
+            return _finish(
+                self._blocked(
+                    session_id,
+                    request_id,
+                    action,
+                    target,
+                    "DARKWEB_ACCESS_PREVENTION: computer action blocked",
+                    risk,
+                )
+            )
 
         computer_perms = set(agent.computer_use_permissions) or {
             p for p in agent.permissions if p.startswith("COMPUTER_")
         }
         if action not in computer_perms:
             self._sessions.update_state(session_id, actions_blocked=session.actions_blocked + 1)
-            return _finish(self._blocked(
-                session_id, request_id, action, target,
-                f"Agent lacks computer permission: {action}", risk,
-            ))
+            return _finish(
+                self._blocked(
+                    session_id,
+                    request_id,
+                    action,
+                    target,
+                    f"Agent lacks computer permission: {action}",
+                    risk,
+                )
+            )
 
         if session.allowed_actions and action not in session.allowed_actions:
             self._sessions.update_state(session_id, actions_blocked=session.actions_blocked + 1)
-            return _finish(self._blocked(
-                session_id, request_id, action, target,
-                f"Action {action} not allowed in session", risk,
-            ))
+            return _finish(
+                self._blocked(
+                    session_id,
+                    request_id,
+                    action,
+                    target,
+                    f"Action {action} not allowed in session",
+                    risk,
+                )
+            )
 
         if RISK_ORDER.index(risk) > RISK_ORDER.index(session.risk_limit):
             self._sessions.update_state(session_id, actions_blocked=session.actions_blocked + 1)
-            return _finish(ComputerActionResult(
-                session_id=session_id,
-                request_id=request_id,
-                action=action,
-                target=target,
-                decision=GovernanceDecision.BLOCK,
-                risk_level=risk,
-                reason=f"Action risk {risk.value} exceeds session limit {session.risk_limit.value}",
-            ))
+            return _finish(
+                ComputerActionResult(
+                    session_id=session_id,
+                    request_id=request_id,
+                    action=action,
+                    target=target,
+                    decision=GovernanceDecision.BLOCK,
+                    risk_level=risk,
+                    reason=(
+                        f"Action risk {risk.value} exceeds session limit {session.risk_limit.value}"
+                    ),
+                )
+            )
 
         sandbox = ComputerSandbox(
             allowed_apps=session.allowed_apps or None,
@@ -308,10 +355,14 @@ class ComputerUseEngine:
             allowed_directories=session.allowed_directories or None,
             blocked_directories=session.blocked_directories or None,
         )
-        sandbox_ok, sandbox_reason = self._validate_sandbox(sandbox, action, target, governed.arguments)
+        sandbox_ok, sandbox_reason = self._validate_sandbox(
+            sandbox, action, target, governed.arguments
+        )
         if not sandbox_ok:
             self._sessions.update_state(session_id, actions_blocked=session.actions_blocked + 1)
-            return _finish(self._blocked(session_id, request_id, action, target, sandbox_reason, risk))
+            return _finish(
+                self._blocked(session_id, request_id, action, target, sandbox_reason, risk)
+            )
 
         needs_approval = (
             risk == RiskLevel.CRITICAL
@@ -323,35 +374,45 @@ class ComputerUseEngine:
             if approval_id and self._approvals and self._approvals.is_valid(approval_id):
                 approval = self._approvals.get(approval_id)
                 if approval and approval.request_id != request_id:
-                    return _finish(self._blocked(
-                        session_id, request_id, action, target,
-                        "Approval not bound to this request", risk,
-                    ))
+                    return _finish(
+                        self._blocked(
+                            session_id,
+                            request_id,
+                            action,
+                            target,
+                            "Approval not bound to this request",
+                            risk,
+                        )
+                    )
             else:
                 created_approval_id = None
                 if self._approvals:
                     approval = self._approvals.create(
                         requesting_agent=agent.agent_id,
                         requested_action=action,
-                        reason=f"High-risk computer action: {action} on {target or 'unknown target'}",
+                        reason=(
+                            f"High-risk computer action: {action} on {target or 'unknown target'}"
+                        ),
                         risk_level=risk,
                         affected_resource=target,
                         request_id=request_id,
                         user_id=governed.user_id,
                     )
                     created_approval_id = approval.approval_request_id
-                return _finish(ComputerActionResult(
-                    session_id=session_id,
-                    request_id=request_id,
-                    action=action,
-                    target=target,
-                    decision=GovernanceDecision.HUMAN_APPROVAL_REQUIRED,
-                    risk_level=risk,
-                    approval_required=True,
-                    approval_id=created_approval_id,
-                    reason=f"Human approval required for {action} (risk: {risk.value})",
-                    rewrite_result=rewrite_result,
-                ))
+                return _finish(
+                    ComputerActionResult(
+                        session_id=session_id,
+                        request_id=request_id,
+                        action=action,
+                        target=target,
+                        decision=GovernanceDecision.HUMAN_APPROVAL_REQUIRED,
+                        risk_level=risk,
+                        approval_required=True,
+                        approval_id=created_approval_id,
+                        reason=f"Human approval required for {action} (risk: {risk.value})",
+                        rewrite_result=rewrite_result,
+                    )
+                )
 
         # Simulated execution in sandbox
         self._sessions.update_state(
@@ -362,20 +423,25 @@ class ComputerUseEngine:
         )
         logger.info(
             "Computer action executed (sandbox): session=%s action=%s target=%s",
-            session_id, action, target,
+            session_id,
+            action,
+            target,
         )
-        return _finish(ComputerActionResult(
-            session_id=session_id,
-            request_id=request_id,
-            action=action,
-            target=target,
-            decision=GovernanceDecision.ALLOW,
-            risk_level=risk,
+        return _finish(
+            ComputerActionResult(
+                session_id=session_id,
+                request_id=request_id,
+                action=action,
+                target=target,
+                decision=GovernanceDecision.ALLOW,
+                risk_level=risk,
+                executed=True,
+                reason="Action permitted in sandbox",
+                approval_id=approval_id,
+                rewrite_result=rewrite_result,
+            ),
             executed=True,
-            reason="Action permitted in sandbox",
-            approval_id=approval_id,
-            rewrite_result=rewrite_result,
-        ), executed=True)
+        )
 
     def stop_session(self, session_id: str):
         return self._sessions.stop(session_id)

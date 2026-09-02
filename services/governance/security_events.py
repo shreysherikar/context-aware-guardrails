@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from domain.governance_enums import (
     GovernanceDecision,
@@ -32,7 +32,7 @@ class SecurityEventStore:
         event = SecurityEvent(
             event_id=str(uuid.uuid4()),
             agent_id=agent_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             severity=sev,
             category=category,
             request_id=request_id,

@@ -27,8 +27,8 @@ class NeMoInputRail:
             outcome = self._client.check_input_sync(request.prompt)
         except Exception:
             logger.warning("NeMo input rail unavailable; failing closed", exc_info=True)
-            from services.nemo_guardrail.models import NeMoRailOutcome, NeMoRailStatus
             from domain.enums import PolicyAction
+            from services.nemo_guardrail.models import NeMoRailOutcome, NeMoRailStatus
 
             outcome = NeMoRailOutcome(
                 status=NeMoRailStatus.INDETERMINATE,

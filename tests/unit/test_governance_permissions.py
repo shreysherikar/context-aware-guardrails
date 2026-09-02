@@ -3,7 +3,7 @@
 import pytest
 
 from domain.governance_enums import RestrictedAction
-from services.governance.permissions import PermissionEngine, RESTRICTED_ACTIONS
+from services.governance.permissions import RESTRICTED_ACTIONS, PermissionEngine
 
 
 @pytest.fixture

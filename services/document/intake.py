@@ -102,7 +102,9 @@ def _extract_xlsx(data: bytes) -> str:
         for sheet in workbook.worksheets:
             parts.append(f"[Sheet: {sheet.title}]")
             for row in sheet.iter_rows(values_only=True):
-                cells = [str(cell).strip() for cell in row if cell is not None and str(cell).strip()]
+                cells = [
+                    str(cell).strip() for cell in row if cell is not None and str(cell).strip()
+                ]
                 if cells:
                     parts.append(" | ".join(cells))
         text = "\n".join(parts).strip()
@@ -191,27 +193,51 @@ def intake_file(
     try:
         if ext == ".pdf" or mime == "application/pdf":
             text = extract_pdf_text(data, max_bytes=max_bytes)
-        elif ext == ".docx" or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        elif (
+            ext == ".docx"
+            or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ):
             text = _extract_docx(data)
-        elif ext in {".xlsx", ".xlsm"} or mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        elif (
+            ext in {".xlsx", ".xlsm"}
+            or mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ):
             text = _extract_xlsx(data)
         elif ext == ".csv" or mime == "text/csv":
             text = _extract_csv(data)
         elif ext == ".json" or mime == "application/json":
             text = _extract_json(data)
-        elif ext in {".txt", ".md", ".markdown", ".log", ".yaml", ".yml", ".xml", ".html", ".htm", ".rtf"} or mime.startswith("text/"):
+        elif ext in {
+            ".txt",
+            ".md",
+            ".markdown",
+            ".log",
+            ".yaml",
+            ".yml",
+            ".xml",
+            ".html",
+            ".htm",
+            ".rtf",
+        } or mime.startswith("text/"):
             text = _truncate(_decode_text(data))
         elif ext == ".doc" or mime == "application/msword":
-            raise FileIntakeError("Legacy .doc files are not supported. Save as .docx and try again.")
+            raise FileIntakeError(
+                "Legacy .doc files are not supported. Save as .docx and try again."
+            )
         elif ext == ".xls" or mime == "application/vnd.ms-excel":
-            raise FileIntakeError("Legacy .xls files are not supported. Save as .xlsx and try again.")
+            raise FileIntakeError(
+                "Legacy .xls files are not supported. Save as .xlsx and try again."
+            )
         elif ext == ".ppt" or ext == ".pptx":
-            raise FileIntakeError("PowerPoint files are not supported yet. Export to PDF or paste the text.")
+            raise FileIntakeError(
+                "PowerPoint files are not supported yet. Export to PDF or paste the text."
+            )
         elif not _looks_binary(data):
             text = _truncate(_decode_text(data))
         else:
             raise FileIntakeError(
-                "This file type could not be read. Try PDF, Word, Excel, CSV, plain text, or an image."
+                "This file type could not be read. Try PDF, Word, Excel, CSV, plain "
+                "text, or an image."
             )
     except DocumentExtractionError as exc:
         raise FileIntakeError(exc.message) from exc

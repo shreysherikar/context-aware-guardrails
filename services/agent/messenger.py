@@ -15,7 +15,9 @@ from services.llm.ollama_client import OllamaError, chat
 
 logger = logging.getLogger(__name__)
 
-_FEEDBACK_SYSTEM = PHARMA_ASSISTANT_SYSTEM + """
+_FEEDBACK_SYSTEM = (
+    PHARMA_ASSISTANT_SYSTEM
+    + """
 
 When a request cannot proceed as written, explain the issue like a helpful colleague:
 - Say what is ambiguous or risky in plain language (HCP targeting, PHI, off-label, fair balance)
@@ -23,6 +25,7 @@ When a request cannot proceed as written, explain the issue like a helpful colle
 - Offer a safer rewrite the user can copy
 - Do NOT answer the original risky question when action is BLOCK or REVIEW
 - When action is ALLOW and an approved answer is provided, you may return only the answer"""
+)
 
 
 def _use_llm_messenger() -> bool:
@@ -90,8 +93,8 @@ async def compose_agent_message(
                         "role": "user",
                         "content": (
                             "Respond to the user based on this guardrail outcome. "
-                            "Sound like a normal internal pharma assistant, not a security tool.\n\n"
-                            + user_payload
+                            "Sound like a normal internal pharma assistant, not a security "
+                            "tool.\n\n" + user_payload
                         ),
                     },
                 ]

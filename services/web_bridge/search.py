@@ -94,7 +94,7 @@ async def search_web(query: str, *, max_results: int | None = None) -> WebSearch
             succeeded=bool(sources),
             error=None if sources else "No search results found.",
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         logger.exception("Web search failed for query=%r", clean[:80])
         return WebSearchResult(
             query=clean,

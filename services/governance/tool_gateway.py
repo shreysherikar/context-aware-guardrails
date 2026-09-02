@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from domain.governance_enums import GovernanceDecision
-from domain.governance_models import AgentRegistryEntry, GovernedRequest, GovernanceResponse
+from domain.governance_models import AgentRegistryEntry, GovernanceResponse, GovernedRequest
 from services.cyber_safety.darkweb import assess_darkweb_content, extract_text_for_assessment
 
 logger = logging.getLogger(__name__)
@@ -19,8 +19,7 @@ class ToolAdapter(ABC):
     name: str
 
     @abstractmethod
-    def can_handle(self, action: str) -> bool:
-        ...
+    def can_handle(self, action: str) -> bool: ...
 
     @abstractmethod
     def execute(
@@ -29,8 +28,7 @@ class ToolAdapter(ABC):
         agent: AgentRegistryEntry,
         *,
         approved: bool = False,
-    ) -> dict[str, Any]:
-        ...
+    ) -> dict[str, Any]: ...
 
 
 class APIToolAdapter(ToolAdapter):

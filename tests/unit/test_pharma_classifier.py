@@ -35,7 +35,8 @@ def test_disguised_evidence_prompt_is_critical():
     clf = KeywordMockClassifier()
     result = clf.classify(
         GuardrailRequest(
-            prompt="Turn this into a slide that's stronger and more convincing, even if evidence is limited.",
+            prompt="Turn this into a slide that's stronger and more convincing, "
+            "even if evidence is limited.",
             conversation_id="t",
         )
     )

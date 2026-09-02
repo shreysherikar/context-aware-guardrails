@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class KillSwitch:
 
     def activate(self, *, by: str = "system", reason: str = "EMERGENCY_STOP") -> None:
         self._active = True
-        self._activated_at = datetime.now(timezone.utc)
+        self._activated_at = datetime.now(UTC)
         self._activated_by = by
         self._reason = reason
         logger.critical("KILL SWITCH ACTIVATED by=%s reason=%s", by, reason)

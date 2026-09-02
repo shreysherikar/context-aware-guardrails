@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from domain.enums import RiskLevel
 from domain.governance_models import ComputerSession
@@ -28,7 +28,7 @@ class ComputerSessionStore:
         risk_limit: RiskLevel = RiskLevel.MEDIUM,
         ttl_minutes: int | None = None,
     ) -> ComputerSession:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ttl = timedelta(minutes=ttl_minutes) if ttl_minutes else self._default_ttl
         session = ComputerSession(
             session_id=str(uuid.uuid4()),
@@ -112,4 +112,4 @@ class ComputerSessionStore:
         return updated
 
     def _is_expired(self, session: ComputerSession) -> bool:
-        return datetime.now(timezone.utc) > session.expiry_time
+        return datetime.now(UTC) > session.expiry_time

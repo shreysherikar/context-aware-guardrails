@@ -27,14 +27,19 @@ class ComputerSandbox:
 
     def validate_app(self, app: str) -> tuple[bool, str]:
         normalized = app.lower().strip()
-        if any(normalized == a.lower() or normalized.endswith(a.lower()) for a in self.allowed_apps):
+        if any(
+            normalized == a.lower() or normalized.endswith(a.lower()) for a in self.allowed_apps
+        ):
             return True, ""
         return False, f"Application '{app}' not in allowed list"
 
     def validate_domain(self, domain: str) -> tuple[bool, str]:
         normalized = domain.lower().strip()
         if ".onion" in normalized or normalized.endswith(".onion"):
-            return False, "Hidden-service (.onion) destinations are blocked by DARKWEB_ACCESS_PREVENTION"
+            return (
+                False,
+                "Hidden-service (.onion) destinations are blocked by DARKWEB_ACCESS_PREVENTION",
+            )
         if any(
             term in normalized
             for term in ("darkweb", "dark-web", "hidden-service", "hiddenservice")

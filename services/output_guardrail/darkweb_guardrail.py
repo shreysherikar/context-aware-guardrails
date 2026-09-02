@@ -19,7 +19,9 @@ class DarkWebOutputGuardrail:
                 blocked=True,
                 safe_text=result.text,
                 rewrite_applied=result.rewrite_applied,
-                reasoning="; ".join(assessment.reasons) if assessment else "Dark-web policy violation",
+                reasoning="; ".join(assessment.reasons)
+                if assessment
+                else "Dark-web policy violation",
                 confidence=assessment.confidence if assessment else 0.9,
                 unverified_claims=assessment.categories if assessment else ["CYBER_SAFETY"],
             )

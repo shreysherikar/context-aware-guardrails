@@ -26,7 +26,15 @@ GLOW = (1.0, 0.78, 0.12, 1.0)
 def clear_scene():
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
-    for datablock in (bpy.data.meshes, bpy.data.curves, bpy.data.materials, bpy.data.armatures, bpy.data.actions, bpy.data.cameras, bpy.data.lights):
+    for datablock in (
+        bpy.data.meshes,
+        bpy.data.curves,
+        bpy.data.materials,
+        bpy.data.armatures,
+        bpy.data.actions,
+        bpy.data.cameras,
+        bpy.data.lights,
+    ):
         for item in list(datablock):
             datablock.remove(item)
 
@@ -67,7 +75,9 @@ def add_bevel_subdiv(obj, width=0.04, segments=4, levels=2):
     bpy.ops.object.modifier_apply(modifier=subdiv.name)
 
 
-def new_material(name, color, roughness=0.42, metallic=0.08, emission=None, emission_strength=0.0, coat=0.12):
+def new_material(
+    name, color, roughness=0.42, metallic=0.08, emission=None, emission_strength=0.0, coat=0.12
+):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     principled = mat.node_tree.nodes.get("Principled BSDF")
@@ -89,7 +99,10 @@ def new_material(name, color, roughness=0.42, metallic=0.08, emission=None, emis
         set_input("Emission Color", emission)
         set_input("Emission Strength", emission_strength)
         # Older node layouts
-        if principled.inputs.get("Emission") is not None and principled.inputs.get("Emission Color") is None:
+        if (
+            principled.inputs.get("Emission") is not None
+            and principled.inputs.get("Emission Color") is None
+        ):
             principled.inputs["Emission"].default_value = emission
     return mat
 
@@ -112,7 +125,9 @@ def make_cube(name, location, scale, mat, bevel=0.05, levels=2):
 
 
 def make_capsule(name, location, radius, length, mat):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, location=location, segments=28, ring_count=16)
+    bpy.ops.mesh.primitive_uv_sphere_add(
+        radius=radius, location=location, segments=28, ring_count=16
+    )
     obj = bpy.context.object
     obj.name = name
     obj.scale = (1.0, 1.0, max(length / (2 * radius), 1.2))
@@ -123,7 +138,9 @@ def make_capsule(name, location, radius, length, mat):
 
 
 def make_sphere(name, location, radius, mat, scale=(1, 1, 1), segments=32):
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, location=location, segments=segments, ring_count=16)
+    bpy.ops.mesh.primitive_uv_sphere_add(
+        radius=radius, location=location, segments=segments, ring_count=16
+    )
     obj = bpy.context.object
     obj.name = name
     obj.scale = scale
@@ -134,7 +151,9 @@ def make_sphere(name, location, radius, mat, scale=(1, 1, 1), segments=32):
 
 
 def make_cylinder(name, location, radius, depth, mat, rotation=(0, 0, 0), vertices=32):
-    bpy.ops.mesh.primitive_cylinder_add(radius=radius, depth=depth, location=location, rotation=rotation, vertices=vertices)
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=radius, depth=depth, location=location, rotation=rotation, vertices=vertices
+    )
     obj = bpy.context.object
     obj.name = name
     apply_object(obj)
@@ -204,22 +223,50 @@ def build_materials():
         "body": new_material("PetBody", BODY, roughness=0.48, metallic=0.04, coat=0.18),
         "bezel": new_material("PetBezel", BEZEL, roughness=0.40, metallic=0.06, coat=0.22),
         "screen": new_material("PetScreen", SCREEN, roughness=0.22, metallic=0.0, coat=0.05),
-        "glow": new_material("PetGlow", GLOW, roughness=0.25, metallic=0.0, emission=GLOW, emission_strength=18.0, coat=0.0),
-        "glow_dim": new_material("PetGlowDim", (0.35, 0.28, 0.08, 1.0), roughness=0.3, metallic=0.0, emission=(0.45, 0.34, 0.08, 1.0), emission_strength=2.2, coat=0.0),
+        "glow": new_material(
+            "PetGlow",
+            GLOW,
+            roughness=0.25,
+            metallic=0.0,
+            emission=GLOW,
+            emission_strength=18.0,
+            coat=0.0,
+        ),
+        "glow_dim": new_material(
+            "PetGlowDim",
+            (0.35, 0.28, 0.08, 1.0),
+            roughness=0.3,
+            metallic=0.0,
+            emission=(0.45, 0.34, 0.08, 1.0),
+            emission_strength=2.2,
+            coat=0.0,
+        ),
     }
 
 
 def build_meshes(mats):
-    head = make_cube("HeadShell", (0.0, 0.0, 0.82), (0.40, 0.26, 0.33), mats["bezel"], bevel=0.09, levels=2)
-    screen = make_cube("HeadScreen", (0.0, -0.205, 0.82), (0.30, 0.04, 0.24), mats["screen"], bevel=0.03, levels=2)
+    head = make_cube(
+        "HeadShell", (0.0, 0.0, 0.82), (0.40, 0.26, 0.33), mats["bezel"], bevel=0.09, levels=2
+    )
+    screen = make_cube(
+        "HeadScreen", (0.0, -0.205, 0.82), (0.30, 0.04, 0.24), mats["screen"], bevel=0.03, levels=2
+    )
 
     antenna_l = make_sphere("Antenna_L", (-0.16, 0.0, 1.18), 0.045, mats["body"])
     antenna_r = make_sphere("Antenna_R", (0.16, 0.0, 1.18), 0.045, mats["body"])
 
-    ear_l = make_cylinder("Ear_L", (-0.42, 0.0, 0.82), 0.11, 0.08, mats["body"], rotation=(0.0, math.pi / 2, 0.0))
-    ear_r = make_cylinder("Ear_R", (0.42, 0.0, 0.82), 0.11, 0.08, mats["body"], rotation=(0.0, math.pi / 2, 0.0))
-    ear_cap_l = make_sphere("EarCap_L", (-0.46, 0.0, 0.82), 0.07, mats["bezel"], scale=(0.45, 1.0, 1.0))
-    ear_cap_r = make_sphere("EarCap_R", (0.46, 0.0, 0.82), 0.07, mats["bezel"], scale=(0.45, 1.0, 1.0))
+    ear_l = make_cylinder(
+        "Ear_L", (-0.42, 0.0, 0.82), 0.11, 0.08, mats["body"], rotation=(0.0, math.pi / 2, 0.0)
+    )
+    ear_r = make_cylinder(
+        "Ear_R", (0.42, 0.0, 0.82), 0.11, 0.08, mats["body"], rotation=(0.0, math.pi / 2, 0.0)
+    )
+    ear_cap_l = make_sphere(
+        "EarCap_L", (-0.46, 0.0, 0.82), 0.07, mats["bezel"], scale=(0.45, 1.0, 1.0)
+    )
+    ear_cap_r = make_sphere(
+        "EarCap_R", (0.46, 0.0, 0.82), 0.07, mats["bezel"], scale=(0.45, 1.0, 1.0)
+    )
 
     body = make_sphere("Body", (0.0, 0.0, 0.40), 0.20, mats["body"], scale=(1.08, 0.95, 1.12))
     arm_l = make_capsule("Arm_L", (-0.34, 0.02, 0.32), 0.07, 0.30, mats["body"])
@@ -235,30 +282,72 @@ def build_meshes(mats):
         parent_keep_world(piece, face_happy)
 
     face_sad = make_empty("PetFace_Sad", (0.0, -0.25, 0.82))
-    sad_l = make_cube("SadEye_L", (-0.09, -0.255, 0.86), (0.07, 0.018, 0.018), mats["glow"], bevel=0.01, levels=1)
-    sad_r = make_cube("SadEye_R", (0.09, -0.255, 0.86), (0.07, 0.018, 0.018), mats["glow"], bevel=0.01, levels=1)
+    sad_l = make_cube(
+        "SadEye_L", (-0.09, -0.255, 0.86), (0.07, 0.018, 0.018), mats["glow"], bevel=0.01, levels=1
+    )
+    sad_r = make_cube(
+        "SadEye_R", (0.09, -0.255, 0.86), (0.07, 0.018, 0.018), mats["glow"], bevel=0.01, levels=1
+    )
     for piece in (sad_l, sad_r):
         parent_keep_world(piece, face_sad)
 
     face_boring = make_empty("PetFace_Boring", (0.0, -0.25, 0.82))
-    bore_l = make_cube("BoreEye_L", (-0.09, -0.255, 0.87), (0.07, 0.018, 0.016), mats["glow"], bevel=0.01, levels=1)
-    bore_r = make_cube("BoreEye_R", (0.09, -0.255, 0.87), (0.07, 0.018, 0.016), mats["glow"], bevel=0.01, levels=1)
-    bore_mouth = make_cube("BoreMouth", (0.0, -0.255, 0.76), (0.08, 0.016, 0.014), mats["glow"], bevel=0.008, levels=1)
+    bore_l = make_cube(
+        "BoreEye_L", (-0.09, -0.255, 0.87), (0.07, 0.018, 0.016), mats["glow"], bevel=0.01, levels=1
+    )
+    bore_r = make_cube(
+        "BoreEye_R", (0.09, -0.255, 0.87), (0.07, 0.018, 0.016), mats["glow"], bevel=0.01, levels=1
+    )
+    bore_mouth = make_cube(
+        "BoreMouth", (0.0, -0.255, 0.76), (0.08, 0.016, 0.014), mats["glow"], bevel=0.008, levels=1
+    )
     for piece in (bore_l, bore_r, bore_mouth):
         parent_keep_world(piece, face_boring)
 
     face_doubt = make_empty("PetFace_Doubt", (0.0, -0.25, 0.82))
     doubt_round = make_sphere("DoubtEye_L", (-0.09, -0.255, 0.86), 0.05, mats["glow"], segments=24)
-    doubt_flat = make_cube("DoubtEye_R", (0.09, -0.255, 0.86), (0.07, 0.018, 0.016), mats["glow"], bevel=0.01, levels=1)
+    doubt_flat = make_cube(
+        "DoubtEye_R", (0.09, -0.255, 0.86), (0.07, 0.018, 0.016), mats["glow"], bevel=0.01, levels=1
+    )
     for piece in (doubt_round, doubt_flat):
         parent_keep_world(piece, face_doubt)
 
     face_battery = make_empty("PetFace_Battery", (0.0, -0.25, 0.82))
-    batt_body = make_cube("BatteryBody", (0.0, -0.255, 0.82), (0.13, 0.02, 0.18), mats["glow"], bevel=0.02, levels=1)
-    batt_nip = make_cube("BatteryNipple", (0.0, -0.255, 1.01), (0.05, 0.016, 0.03), mats["glow"], bevel=0.01, levels=1)
-    batt_fill = make_cube("BatteryFill", (0.0, -0.268, 0.72), (0.09, 0.012, 0.045), mats["glow"], bevel=0.008, levels=1)
-    batt_empty_a = make_cube("BatteryEmptyA", (0.0, -0.268, 0.82), (0.09, 0.01, 0.04), mats["glow_dim"], bevel=0.006, levels=1)
-    batt_empty_b = make_cube("BatteryEmptyB", (0.0, -0.268, 0.91), (0.09, 0.01, 0.04), mats["glow_dim"], bevel=0.006, levels=1)
+    batt_body = make_cube(
+        "BatteryBody", (0.0, -0.255, 0.82), (0.13, 0.02, 0.18), mats["glow"], bevel=0.02, levels=1
+    )
+    batt_nip = make_cube(
+        "BatteryNipple",
+        (0.0, -0.255, 1.01),
+        (0.05, 0.016, 0.03),
+        mats["glow"],
+        bevel=0.01,
+        levels=1,
+    )
+    batt_fill = make_cube(
+        "BatteryFill",
+        (0.0, -0.268, 0.72),
+        (0.09, 0.012, 0.045),
+        mats["glow"],
+        bevel=0.008,
+        levels=1,
+    )
+    batt_empty_a = make_cube(
+        "BatteryEmptyA",
+        (0.0, -0.268, 0.82),
+        (0.09, 0.01, 0.04),
+        mats["glow_dim"],
+        bevel=0.006,
+        levels=1,
+    )
+    batt_empty_b = make_cube(
+        "BatteryEmptyB",
+        (0.0, -0.268, 0.91),
+        (0.09, 0.01, 0.04),
+        mats["glow_dim"],
+        bevel=0.006,
+        levels=1,
+    )
     for piece in (batt_body, batt_nip, batt_fill, batt_empty_a, batt_empty_b):
         parent_keep_world(piece, face_battery)
 
@@ -501,7 +590,12 @@ def build_animations(armature):
         "low-battery",
         [
             (1, sit_legs),
-            (16, merge_pose(zero_pose(), **{**sit_legs, "Head": (Vector((0, 0, -0.01)), eul(6, 0, 0))})),
+            (
+                16,
+                merge_pose(
+                    zero_pose(), **{**sit_legs, "Head": (Vector((0, 0, -0.01)), eul(6, 0, 0))}
+                ),
+            ),
             (32, sit_legs),
         ],
     )
@@ -511,7 +605,9 @@ def build_animations(armature):
 
 
 def setup_preview_camera():
-    bpy.ops.object.camera_add(location=(1.15, -2.35, 0.82), rotation=(math.radians(73), 0.0, math.radians(22)))
+    bpy.ops.object.camera_add(
+        location=(1.15, -2.35, 0.82), rotation=(math.radians(73), 0.0, math.radians(22))
+    )
     camera = bpy.context.object
     camera.name = "PreviewCamera"
     camera.data.lens = 50
@@ -561,7 +657,12 @@ def export_glb(path: Path):
 def render_preview(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items.keys() else "BLENDER_EEVEE"
+    scene.render.engine = (
+        "BLENDER_EEVEE_NEXT"
+        if "BLENDER_EEVEE_NEXT"
+        in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items.keys()
+        else "BLENDER_EEVEE"
+    )
     scene.render.resolution_x = 768
     scene.render.resolution_y = 768
     scene.render.filepath = str(path)

@@ -20,7 +20,7 @@ _EXTRACT_PROMPT = (
 
 
 def _vision_model() -> str:
-    return os.getenv("OLLAMA_VISION_MODEL") or os.getenv("OLLAMA_MODEL", "qwen3.6:latest")
+    return os.getenv("OLLAMA_VISION_MODEL", "") or os.getenv("OLLAMA_MODEL", "qwen3.6:latest")
 
 
 class OllamaOCRProvider:

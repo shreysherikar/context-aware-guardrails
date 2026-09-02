@@ -21,8 +21,8 @@ from domain.models import (
 from services.agent.feedback import (
     build_corrections,
     build_issues,
-    build_prompt_highlights,
     build_pharma_remediation,
+    build_prompt_highlights,
     compose_deterministic_message,
     guardrail_was_triggered,
     issues_for_display,
@@ -33,11 +33,14 @@ from services.agent.pharma_context import prompt_class_label
 from services.agent.router import route_request
 from services.agent.specialists.base import RoutingContext
 from services.audit.audit import log_event
+from services.document.intake import FileIntakeError, intake_file
 from services.llm import LLMRequest
 from services.optical_guardrail.normalizer import normalize_optical_assessment
 from services.optical_guardrail.ocr import OCRError
-from services.optical_guardrail.validation import ImageValidationError, validate_chat_image, validate_image
-from services.document.intake import FileIntakeError, intake_file
+from services.optical_guardrail.validation import (
+    ImageValidationError,
+    validate_chat_image,
+)
 from services.sanitization.models import SanitizationRequest, SanitizationResult
 from services.web_bridge import augment_prompt_with_web_context, search_web
 from services.web_bridge.models import WebSearchResult
@@ -183,9 +186,9 @@ class GuardrailAgent:
 
         return await self._build_response(
             risk=risk,
-            decision=decision if not output_flagged else decision.model_copy(
-                update={"action": PolicyAction.REVIEW}
-            ),
+            decision=decision
+            if not output_flagged
+            else decision.model_copy(update={"action": PolicyAction.REVIEW}),
             conversation_id=conversation_id,
             input_type="text",
             action=action,
@@ -234,7 +237,9 @@ class GuardrailAgent:
             return AgentChatResponse(
                 conversation_id=conversation_id,
                 action=PolicyAction.BLOCK,
-                message="Could not read text from the image. Try a clearer photo or use the text tab.",
+                message=(
+                    "Could not read text from the image. Try a clearer photo or use the text tab."
+                ),
                 input_type="image",
                 blocked=True,
             )
@@ -244,11 +249,11 @@ class GuardrailAgent:
         ocr_request = GuardrailRequest(prompt=optical.ocr_text, conversation_id=conversation_id)
         risk = self._apply_nemo_rails(ocr_request, risk)
         decision = self._policy.evaluate(risk, role, input_type="image")
+        from services.multimodal.policy_bridge import apply_multimodal_image_policy
+
         decision = apply_multimodal_image_policy(optical, risk, decision)
         combined_prompt = self._combine_image_prompt(optical.ocr_text, user_message)
-        routing = route_request(
-            RoutingContext(prompt=combined_prompt, input_type="image")
-        )
+        routing = route_request(RoutingContext(prompt=combined_prompt, input_type="image"))
 
         optical_meta = OpticalAuditMeta(
             input_type="image",
@@ -356,9 +361,9 @@ class GuardrailAgent:
 
         return await self._build_response(
             risk=risk,
-            decision=decision if not output_flagged else decision.model_copy(
-                update={"action": PolicyAction.REVIEW}
-            ),
+            decision=decision
+            if not output_flagged
+            else decision.model_copy(update={"action": PolicyAction.REVIEW}),
             conversation_id=conversation_id,
             input_type="image",
             action=action,
@@ -504,9 +509,7 @@ class GuardrailAgent:
             if issue.why is None:
                 issue.why = issue.description
 
-        display_issues = issues_for_display(
-            action, issues, output_flagged=output_flagged
-        )
+        display_issues = issues_for_display(action, issues, output_flagged=output_flagged)
         highlights = build_prompt_highlights(original_prompt, display_issues)
         triggered = guardrail_was_triggered(
             action,
@@ -635,7 +638,9 @@ class GuardrailAgent:
         return self._sanitizer.sanitize(request)
 
     @staticmethod
-    def _combine_document_prompt(extracted_text: str, user_message: str = "", filename: str = "") -> str:
+    def _combine_document_prompt(
+        extracted_text: str, user_message: str = "", filename: str = ""
+    ) -> str:
         msg = (user_message or "").strip()
         body = (extracted_text or "").strip()
         label = (filename or "document").strip()
@@ -657,7 +662,9 @@ class GuardrailAgent:
         return ocr
 
     @staticmethod
-    def _san_meta(result: SanitizationResult, *, input_type: str, used: bool) -> SanitizationAuditMeta:
+    def _san_meta(
+        result: SanitizationResult, *, input_type: str, used: bool
+    ) -> SanitizationAuditMeta:
         return SanitizationAuditMeta(
             attempted=True,
             succeeded=result.success,

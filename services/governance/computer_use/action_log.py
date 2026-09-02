@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from domain.enums import RiskLevel
 from domain.governance_enums import GovernanceDecision
@@ -34,7 +34,7 @@ class ComputerActionLogStore:
             session_id=session_id,
             agent_id=agent_id,
             request_id=request_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             action=action,
             target=target,
             decision=decision,
@@ -49,7 +49,7 @@ class ComputerActionLogStore:
         return entry
 
     def list_for_session(self, session_id: str, limit: int = 50) -> list[ComputerActionLog]:
-        items = [l for l in self._logs if l.session_id == session_id]
+        items = [log for log in self._logs if log.session_id == session_id]
         return items[-limit:]
 
     def list_recent(self, limit: int = 50) -> list[ComputerActionLog]:

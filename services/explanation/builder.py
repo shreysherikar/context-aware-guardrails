@@ -5,8 +5,8 @@ from __future__ import annotations
 from domain.enums import PolicyAction, ResolutionType, RiskCategory, RiskLevel
 from domain.models import (
     ExplainableDecision,
-    LLMStatusStep,
     LLMResult,
+    LLMStatusStep,
     OpticalFinding,
     OutputGuardrailResult,
     PolicyDecision,
@@ -48,7 +48,11 @@ _REPHRASE_FRIENDLY_CATEGORIES = {
     RiskCategory.PHI,
 }
 
-_PIPELINE_FAILURE_POLICY_IDS = {"ERROR-FAIL-CLOSED", "DEFAULT-FAIL-CLOSED", "CLASSIFIER-FAIL-CLOSED"}
+_PIPELINE_FAILURE_POLICY_IDS = {
+    "ERROR-FAIL-CLOSED",
+    "DEFAULT-FAIL-CLOSED",
+    "CLASSIFIER-FAIL-CLOSED",
+}
 
 
 def _effective_decision(
@@ -332,7 +336,8 @@ def build_explainable_decision(
         original_prompt=original_prompt,
     )
     display_issues = issues_for_display(
-        effective if effective != PolicyAction.REVIEW and policy_action == PolicyAction.CLARIFY
+        effective
+        if effective != PolicyAction.REVIEW and policy_action == PolicyAction.CLARIFY
         else policy_action,
         issues,
         output_flagged=output_flagged,
@@ -365,7 +370,9 @@ def build_explainable_decision(
         decision=effective,
         forwarded_to_llm=forwarded,
         category=_primary_category(risk, display_issues),
-        reason=_user_reason(effective, pipeline_failure=pipeline_failure, output_flagged=output_flagged),
+        reason=_user_reason(
+            effective, pipeline_failure=pipeline_failure, output_flagged=output_flagged
+        ),
         detected_elements=detected,
         resolution_type=resolution_type,
         resolution_message=resolution_message,
@@ -425,6 +432,5 @@ def build_rephrase_suggestion(
             "threat intelligence instead."
         )
     return (
-        "Please rephrase your request to focus on a legitimate, authorized, "
-        "and compliant purpose."
+        "Please rephrase your request to focus on a legitimate, authorized, and compliant purpose."
     )

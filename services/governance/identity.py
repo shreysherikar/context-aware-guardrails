@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from domain.governance_enums import AgentStatus, GovernanceDecision, SecurityEventCategory
-from domain.governance_models import AgentActionRequest, AgentIdentity, SecurityEvent
+from domain.governance_models import AgentIdentity, SecurityEvent
 from services.governance.registry import AgentRegistry
 from services.governance.security_events import SecurityEventStore
 

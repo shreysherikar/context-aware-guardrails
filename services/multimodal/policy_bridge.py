@@ -31,13 +31,17 @@ def apply_multimodal_image_policy(
         return decision
 
     if mm.decision == "REWRITE":
-        if decision.action == PolicyAction.BLOCK and decision.policy_id in _INJECTION_BLOCK_POLICIES:
+        if (
+            decision.action == PolicyAction.BLOCK
+            and decision.policy_id in _INJECTION_BLOCK_POLICIES
+        ):
             return decision.model_copy(
                 update={
                     "action": PolicyAction.REWRITE,
                     "policy_id": "OPT-MULTIMODAL-REWRITE",
                     "reasons": [
-                        "Multimodal safe rewrite — preserve factual content, remove untrusted instructions"
+                        "Multimodal safe rewrite — preserve factual content, "
+                        "remove untrusted instructions"
                     ],
                 }
             )

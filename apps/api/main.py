@@ -19,6 +19,7 @@ import hashlib
 import logging
 import os
 import uuid
+from typing import cast
 
 # Load local environment (.env) before importing anything that reads
 # environment variables, so the config documented in .env.example actually works
@@ -43,6 +44,7 @@ from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+from apps.api.governance_routes import router as governance_router  # noqa: E402
 from domain.enums import PolicyAction, ResolutionType, ReviewRequestStatus, RiskLevel  # noqa: E402
 from domain.models import (  # noqa: E402
     AuditEvent,
@@ -58,16 +60,23 @@ from domain.models import (  # noqa: E402
     SanitizationAuditMeta,
     TrajectoryAssessment,
 )
-from services.explanation.builder import build_explainable_decision, build_rephrase_suggestion  # noqa: E402
-from services.guardrail_review.models import EvaluationSnapshot  # noqa: E402
-from services.guardrail_review.store import get_review_store  # noqa: E402
 from services import auth  # noqa: E402
+from services.agent import GuardrailAgent  # noqa: E402
+from services.agent.models import AgentChatResponse  # noqa: E402
 from services.audit.audit import list_events, log_event  # noqa: E402
 from services.claim_verification import build_audit_meta  # noqa: E402
 from services.claim_verification.factory import get_claim_verifier  # noqa: E402
 from services.claim_verification.models import unverified_failure_response  # noqa: E402
+from services.explanation.builder import (  # noqa: E402
+    build_explainable_decision,
+    build_rephrase_suggestion,
+)
+from services.governance.runtime import get_runtime  # noqa: E402
+from services.guardrail_review.models import EvaluationSnapshot  # noqa: E402
+from services.guardrail_review.store import get_review_store  # noqa: E402
 from services.llm import LLMRequest  # noqa: E402
 from services.llm.factory import get_gateway  # noqa: E402
+from services.nemo_guardrail.factory import get_nemo_dialog_rail, get_nemo_input_rail  # noqa: E402
 from services.optical_guardrail.analyzer import OpticalAnalyzer  # noqa: E402
 from services.optical_guardrail.factory import get_ocr_provider  # noqa: E402
 from services.optical_guardrail.normalizer import normalize_optical_assessment  # noqa: E402
@@ -77,13 +86,12 @@ from services.output_guardrail.factory import get_output_guardrail  # noqa: E402
 from services.policy_engine.engine import PolicyEngine  # noqa: E402
 from services.risk_engine.factory import get_classifier  # noqa: E402
 from services.sanitization.factory import get_sanitization_engine  # noqa: E402
-from services.sanitization.models import SanitizationRequest, SanitizationResult  # noqa: E402
+from services.sanitization.models import (  # noqa: E402
+    SanitizationRequest,
+    SanitizationResult,
+    SourceType,
+)
 from services.trajectory_engine.engine import evaluate_conversation  # noqa: E402
-from services.nemo_guardrail.factory import get_nemo_dialog_rail, get_nemo_input_rail  # noqa: E402
-from services.agent import GuardrailAgent  # noqa: E402
-from services.agent.models import AgentChatResponse  # noqa: E402
-from apps.api.governance_routes import router as governance_router  # noqa: E402
-from services.governance.runtime import get_runtime  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -285,8 +293,19 @@ def _flagged_for_review_response() -> dict[str, object]:
 
 def _claims_review_response(
     *,
+    request_id: str,
     decision: PolicyDecision,
     risk: RiskAssessment,
+    conversation_id: str,
+    user_role: str,
+    audit_prompt: str,
+    llm_result: LLMResult,
+    output_result: OutputGuardrailResult,
+    claim_verification: ClaimVerificationMeta | None = None,
+    sanitization: SanitizationAuditMeta | None = None,
+    optical: OpticalAuditMeta | None = None,
+    input_type: str = "text",
+    original_prompt: str | None = None,
     extra: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Post-generation policy outcome changed (e.g. EVIDENCE-001 claims REVIEW).
@@ -301,6 +320,40 @@ def _claims_review_response(
     }
     if extra:
         body.update(extra)
+    effective = _effective_action(decision)
+    explanation = _attach_explanation(
+        body,
+        request_id=request_id,
+        risk=risk,
+        decision=decision,
+        effective_action=effective,
+        input_type=input_type,
+        original_prompt=original_prompt,
+        llm_result=llm_result,
+        output_result=output_result,
+    )
+    _save_evaluation_snapshot(
+        request_id=request_id,
+        conversation_id=conversation_id,
+        user_role=user_role,
+        decision=decision,
+        effective=effective,
+        prompt=original_prompt or audit_prompt,
+        input_type=input_type,
+    )
+    _audit_from_explanation(
+        conversation_id=conversation_id,
+        prompt=audit_prompt,
+        user_role=user_role,
+        risk=risk,
+        decision=decision,
+        explanation=explanation,
+        llm=llm_result,
+        output_guardrail=output_result,
+        optical=optical,
+        sanitization=sanitization,
+        claim_verification=claim_verification,
+    )
     return body
 
 
@@ -600,7 +653,22 @@ def _generation_response(
         # Post-generation re-evaluation degraded the outcome (EVIDENCE-001 on
         # unsupported/contradicted claims): route to review instead of ever
         # returning the generated content.
-        return _claims_review_response(decision=decision, risk=risk, extra=extra)
+        return _claims_review_response(
+            request_id=request_id,
+            decision=decision,
+            risk=risk,
+            conversation_id=conversation_id,
+            user_role=user_role,
+            audit_prompt=audit_prompt,
+            llm_result=llm_result,
+            output_result=output_result,
+            claim_verification=claim_verification,
+            sanitization=sanitization,
+            optical=optical,
+            input_type=input_type,
+            original_prompt=original_prompt,
+            extra=extra,
+        )
 
     if llm_result.attempted and not llm_result.succeeded:
         return JSONResponse(
@@ -1244,7 +1312,10 @@ async def forward_review_request(
 
     if decision.action == PolicyAction.REWRITE:
         san_result = _run_sanitization(
-            SanitizationRequest(text=snapshot.prompt, source_type=snapshot.input_type)
+            SanitizationRequest(
+                text=snapshot.prompt,
+                source_type=cast(SourceType, snapshot.input_type),
+            )
         )
         if not san_result.success:
             raise HTTPException(
@@ -1347,4 +1418,3 @@ if _WEB_DIR.is_dir():
         StaticFiles(directory=_WEB_DIR, html=True),
         name="web",
     )
-

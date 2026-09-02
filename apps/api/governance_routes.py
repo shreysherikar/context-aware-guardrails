@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -19,9 +17,9 @@ from domain.governance_models import (
     ComputerActionResult,
     ComputerEnvironment,
     ComputerSession,
-    GovernedRequest,
     GovernanceAuditRecord,
     GovernanceResponse,
+    GovernedRequest,
     RuntimeStatus,
     SafeRewriteResult,
     SecurityEvent,
@@ -160,6 +158,7 @@ def _to_governed(body: GovernedRequestBody) -> GovernedRequest:
 
 # --- Agent Registry ---
 
+
 @router.post("/agents/register", response_model=AgentRegistryEntry)
 def register_agent(body: AgentRegisterRequest) -> AgentRegistryEntry:
     runtime = get_runtime()
@@ -183,6 +182,7 @@ def get_agent(agent_id: str) -> AgentRegistryEntry:
 
 
 # --- Unified Requests ---
+
 
 @router.post("/requests", response_model=GovernanceResponse)
 def submit_request(body: GovernedRequestBody) -> GovernanceResponse:
@@ -223,6 +223,7 @@ def policy_evaluate(body: PolicyEvaluateBody) -> GovernanceResponse:
 
 
 # --- Safe Rewriting ---
+
 
 @router.post("/rewrite", response_model=SafeRewriteResult)
 def rewrite_content(body: RewriteBody) -> SafeRewriteResult:
@@ -269,6 +270,7 @@ def recent_rewrites(limit: int = 20) -> list[dict]:
 
 # --- Approvals ---
 
+
 @router.get("/approval", response_model=list[ApprovalRequest])
 @router.get("/approvals", response_model=list[ApprovalRequest])
 def list_approvals() -> list[ApprovalRequest]:
@@ -294,6 +296,7 @@ def reject_request(approval_id: str, body: ApprovalActionBody) -> ApprovalReques
 
 
 # --- Computer Use ---
+
 
 @router.get("/computer/environments", response_model=list[ComputerEnvironment])
 def list_computer_environments() -> list[ComputerEnvironment]:
@@ -375,6 +378,7 @@ def stop_computer_session(session_id: str) -> ComputerSession:
 
 # --- GxP Review ---
 
+
 @router.get("/gxp/frameworks")
 def get_gxp_frameworks() -> list[dict[str, str]]:
     return list_gxp_frameworks()
@@ -389,6 +393,7 @@ def gxp_review(body: GxpReviewBody) -> GxpReviewResult:
 
 # --- Emergency Kill Switch ---
 
+
 @router.post("/system/emergency-stop")
 def activate_emergency_stop(body: EmergencyStopBody) -> dict:
     get_runtime().activate_emergency_stop(by=body.by, reason=body.reason)
@@ -402,6 +407,7 @@ def deactivate_emergency_stop(body: EmergencyStopBody) -> dict:
 
 
 # --- Audit & Security ---
+
 
 @router.get("/audit", response_model=list[GovernanceAuditRecord])
 def get_audit(limit: int = 50) -> list[GovernanceAuditRecord]:

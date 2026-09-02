@@ -260,7 +260,8 @@ class GuardrailReviewStore:
         try:
             conn.execute(
                 """INSERT INTO decision_reports
-                   (report_id, evaluation_request_id, conversation_id, user_role, comment, status, created_at)
+                   (report_id, evaluation_request_id, conversation_id, user_role,
+                    comment, status, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (
                     report.report_id,

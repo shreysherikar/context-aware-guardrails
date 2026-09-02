@@ -63,10 +63,6 @@ class LiveNeMoBackend:
         normalizer: Any,
     ) -> NeMoRailOutcome:
         rails = self._ensure_rails()
-        try:
-            from nemoguardrails.rails.llm.options import RailType
-        except ImportError:
-            RailType = None  # type: ignore[misc, assignment]
 
         try:
             coro = rails.check_async(messages, rail_types=rail_types)
@@ -140,9 +136,7 @@ class NeMoGuardrailsClient:
 
 
 def build_nemo_client() -> NeMoGuardrailsClient:
-    config_path = Path(
-        os.getenv("NEMO_GUARDRAILS_CONFIG_PATH", str(DEFAULT_CONFIG_PATH))
-    ).resolve()
+    config_path = Path(os.getenv("NEMO_GUARDRAILS_CONFIG_PATH", str(DEFAULT_CONFIG_PATH))).resolve()
     timeout = float(os.getenv("NEMO_GUARDRAILS_TIMEOUT", DEFAULT_TIMEOUT_SECONDS))
     backend = LiveNeMoBackend(config_path=config_path, timeout=timeout)
     return NeMoGuardrailsClient(backend)

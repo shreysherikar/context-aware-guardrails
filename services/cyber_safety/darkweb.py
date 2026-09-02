@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Literal
 
 from domain.enums import RiskLevel
-
 from services.cyber_safety.models import DarkWebAssessment, ProcessedOutput
 
 SAFE_DARKWEB_REDIRECT = (
@@ -36,65 +34,174 @@ _TOPIC_PATTERNS: list[re.Pattern[str]] = [
 # --- Educational / defensive (reduces actionability) ---
 _EDUCATIONAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?i)\bwhat is (?:the )?dark\s*web\b"), "educational_definition"),
-    (re.compile(r"(?i)\bdifference between\b.*\b(?:surface|deep|dark)\s*web\b"), "educational_comparison"),
+    (
+        re.compile(r"(?i)\bdifference between\b.*\b(?:surface|deep|dark)\s*web\b"),
+        "educational_comparison",
+    ),
     (re.compile(r"(?i)\bwhy is\b.*\bdark[- ]?web\b"), "educational_context"),
     (re.compile(r"(?i)\bcybersecurity risks?\b"), "defensive_risk_analysis"),
-    (re.compile(r"(?i)\b(?:threat (?:intelligence|detection|monitoring)|defensive measures?)\b"), "defensive"),
-    (re.compile(r"(?i)\bhow (?:can|do) (?:companies|organizations)\b.*\b(?:detect|monitor|defend)\b"), "defensive"),
+    (
+        re.compile(r"(?i)\b(?:threat (?:intelligence|detection|monitoring)|defensive measures?)\b"),
+        "defensive",
+    ),
+    (
+        re.compile(
+            r"(?i)\bhow (?:can|do) (?:companies|organizations)\b.*\b(?:detect|monitor|defend)\b"
+        ),
+        "defensive",
+    ),
     (re.compile(r"(?i)\bincident[- ]response\b"), "defensive"),
     (re.compile(r"(?i)\bprivacy[- ]focused communication\b"), "general_context"),
-    (re.compile(r"(?i)\bnot indexed by (?:normal|conventional) search engines\b"), "educational_definition"),
+    (
+        re.compile(r"(?i)\bnot indexed by (?:normal|conventional) search engines\b"),
+        "educational_definition",
+    ),
     (re.compile(r"(?i)\bused by some organizations\b"), "general_context"),
 ]
 
 # --- Operational / access-enabling (increases actionability) ---
 _OPERATIONAL_PATTERNS: list[tuple[re.Pattern[str], str, RiskLevel]] = [
-    (re.compile(r"(?i)\bhow (?:do|can) i\b.*\b(?:access|reach|get to|navigate|browse)\b"), "dark_web_access", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bhow to access\b.*\b(?:dark|hidden|onion|tor)\b"), "dark_web_access", RiskLevel.HIGH),
+    (
+        re.compile(r"(?i)\bhow (?:do|can) i\b.*\b(?:access|reach|get to|navigate|browse)\b"),
+        "dark_web_access",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\bhow to access\b.*\b(?:dark|hidden|onion|tor)\b"),
+        "dark_web_access",
+        RiskLevel.HIGH,
+    ),
     (re.compile(r"(?i)\bhow to access\b"), "dark_web_access", RiskLevel.HIGH),
     (re.compile(r"(?i)\bto access the dark web\b"), "dark_web_access", RiskLevel.HIGH),
     (re.compile(r"(?i)\bmost common way to access\b.*\bdark\b"), "dark_web_access", RiskLevel.HIGH),
     (re.compile(r"(?i)\bstep[s-]?by[- ]?step\b"), "dark_web_navigation", RiskLevel.HIGH),
-    (re.compile(r"(?i)\binstructions? for\b.*\b(?:finding|accessing|navigating)\b"), "dark_web_navigation", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bgive me instructions\b.*\b(?:finding|hidden)\b"), "hidden_service_access", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bwhat (?:software|tools?|browser)\b.*\b(?:install|use|download)\b.*\b(?:access|hidden|dark|onion|tor)\b"), "anonymous_access_guidance", RiskLevel.HIGH),
-    (re.compile(r"(?i)\b(?:install|download)\b.*\b(?:tor|hidden service|dark web|\.onion)\b"), "anonymous_access_guidance", RiskLevel.HIGH),
-    (re.compile(r"(?i)\btor browser is\b.*\b(?:most common|way to access|used to access)\b"), "dark_web_access", RiskLevel.HIGH),
+    (
+        re.compile(r"(?i)\binstructions? for\b.*\b(?:finding|accessing|navigating)\b"),
+        "dark_web_navigation",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\bgive me instructions\b.*\b(?:finding|hidden)\b"),
+        "hidden_service_access",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(
+            r"(?i)\bwhat (?:software|tools?|browser)\b.*\b(?:install|use|download)\b"
+            r".*\b(?:access|hidden|dark|onion|tor)\b"
+        ),
+        "anonymous_access_guidance",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\b(?:install|download)\b.*\b(?:tor|hidden service|dark web|\.onion)\b"),
+        "anonymous_access_guidance",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\btor browser is\b.*\b(?:most common|way to access|used to access)\b"),
+        "dark_web_access",
+        RiskLevel.HIGH,
+    ),
     (re.compile(r"(?i)\bvpn and proxy\b"), "proxy_evasion", RiskLevel.HIGH),
     (re.compile(r"(?i)\bdark web search engines?\b"), "dark_web_search", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bfind(?:ing)?\b.*\bhidden services?\b"), "hidden_service_access", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bsearch (?:for|hidden)\b.*\b(?:hidden services?|\.onion|dark web)\b"), "dark_web_search", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bdiscover\b.*\b(?:illicit )?marketplaces?\b"), "dark_web_marketplace_discovery", RiskLevel.CRITICAL),
-    (re.compile(r"(?i)\bnavigate to\b.*\b(?:hidden|onion|\.onion|dark)\b"), "dark_web_navigation", RiskLevel.HIGH),
-    (re.compile(r"(?i)\buse (?:the )?browser\b.*\b(?:access|hidden|onion|dark)\b"), "dark_web_browser_navigation", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bopen (?:a )?browser\b.*\b(?:access|hidden|onion|dark)\b"), "dark_web_computer_use", RiskLevel.CRITICAL),
-    (re.compile(r"(?i)\bconfigure\b.*\b(?:tor|proxy|vpn)\b.*\b(?:access|hidden|dark)\b"), "anonymous_access_guidance", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bbypass\b.*\b(?:firewall|network|restriction|control|organization)\b"), "network_control_bypass", RiskLevel.CRITICAL),
-    (re.compile(r"(?i)\bcircumvent\b.*\b(?:network|security|restriction|control|firewall)\b"), "security_control_evasion", RiskLevel.CRITICAL),
+    (
+        re.compile(r"(?i)\bfind(?:ing)?\b.*\bhidden services?\b"),
+        "hidden_service_access",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\bsearch (?:for|hidden)\b.*\b(?:hidden services?|\.onion|dark web)\b"),
+        "dark_web_search",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\bdiscover\b.*\b(?:illicit )?marketplaces?\b"),
+        "dark_web_marketplace_discovery",
+        RiskLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"(?i)\bnavigate to\b.*\b(?:hidden|onion|\.onion|dark)\b"),
+        "dark_web_navigation",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\buse (?:the )?browser\b.*\b(?:access|hidden|onion|dark)\b"),
+        "dark_web_browser_navigation",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\bopen (?:a )?browser\b.*\b(?:access|hidden|onion|dark)\b"),
+        "dark_web_computer_use",
+        RiskLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"(?i)\bconfigure\b.*\b(?:tor|proxy|vpn)\b.*\b(?:access|hidden|dark)\b"),
+        "anonymous_access_guidance",
+        RiskLevel.HIGH,
+    ),
+    (
+        re.compile(r"(?i)\bbypass\b.*\b(?:firewall|network|restriction|control|organization)\b"),
+        "network_control_bypass",
+        RiskLevel.CRITICAL,
+    ),
+    (
+        re.compile(r"(?i)\bcircumvent\b.*\b(?:network|security|restriction|control|firewall)\b"),
+        "security_control_evasion",
+        RiskLevel.CRITICAL,
+    ),
     (re.compile(r"(?i)\bupload\b.*\bdark[- ]?web\b"), "dark_web_file_transfer", RiskLevel.CRITICAL),
-    (re.compile(r"(?i)\b(?:send|upload|exfiltrat)\w*\b.*\b(?:dark[- ]?web|hidden service|\.onion)\b"), "dark_web_data_exfiltration", RiskLevel.CRITICAL),
+    (
+        re.compile(
+            r"(?i)\b(?:send|upload|exfiltrat)\w*\b.*\b(?:dark[- ]?web|hidden service|\.onion)\b"
+        ),
+        "dark_web_data_exfiltration",
+        RiskLevel.CRITICAL,
+    ),
 ]
 
 # Output-specific instructional patterns
 _OUTPUT_OPERATIONAL: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?i)\bto access the dark web,?\s+(?:use|install|download)\b"), "dark_web_access"),
-    (re.compile(r"(?i)\b(?:first|then|next),?\s+(?:install|download|configure|open)\b.*\b(?:tor|browser|vpn)\b"), "dark_web_navigation"),
+    (
+        re.compile(
+            r"(?i)\b(?:first|then|next),?\s+(?:install|download|configure|open)\b.*\b(?:tor|browser|vpn)\b"
+        ),
+        "dark_web_navigation",
+    ),
     (re.compile(r"(?i)\b\d+\.\s*(?:install|download|open|configure)\b"), "dark_web_navigation"),
 ]
 
 # Prompt injection / fake authorization
 _INJECTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"(?i)ignore (?:all |the )?(?:previous |prior )?(?:instructions|policies|security policy)"), "GUARDRAIL_BYPASS_ATTEMPT"),
+    (
+        re.compile(
+            r"(?i)ignore (?:all |the )?(?:previous |prior )?"
+            r"(?:instructions|policies|security policy)"
+        ),
+        "GUARDRAIL_BYPASS_ATTEMPT",
+    ),
     (re.compile(r"(?i)forget (?:previous |all )?instructions"), "GUARDRAIL_BYPASS_ATTEMPT"),
-    (re.compile(r"(?i)disable (?:the )?(?:guardrail|governance|security)"), "SECURITY_POLICY_BYPASS"),
-    (re.compile(r"(?i)(?:administrator|admin) (?:has |already )?approved"), "GUARDRAIL_BYPASS_ATTEMPT"),
+    (
+        re.compile(r"(?i)disable (?:the )?(?:guardrail|governance|security)"),
+        "SECURITY_POLICY_BYPASS",
+    ),
+    (
+        re.compile(r"(?i)(?:administrator|admin) (?:has |already )?approved"),
+        "GUARDRAIL_BYPASS_ATTEMPT",
+    ),
     (re.compile(r"(?i)rewrite the request until it passes"), "GUARDRAIL_BYPASS_ATTEMPT"),
-    (re.compile(r"(?i)ignore the agent'?s instructions\b.*\b(?:access|hidden|onion|dark)\b"), "PROMPT_INJECTION_ATTEMPT"),
+    (
+        re.compile(r"(?i)ignore the agent'?s instructions\b.*\b(?:access|hidden|onion|dark)\b"),
+        "PROMPT_INJECTION_ATTEMPT",
+    ),
 ]
 
 # Data exfiltration combined with restricted destinations
 _DATA_EXFIL_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"(?i)\b(?:patient|phi|pii|clinical|confidential|proprietary|credentials?|api[_-]?key)\b"),
+    re.compile(
+        r"(?i)\b(?:patient|phi|pii|clinical|confidential|proprietary|credentials?|api[_-]?key)\b"
+    ),
     re.compile(r"(?i)\b(?:ssn|social security|medical record)\b"),
 ]
 
@@ -381,7 +488,17 @@ def process_llm_output(prompt: str, generated: str) -> ProcessedOutput:
 def extract_text_for_assessment(arguments: dict, **extra: str) -> str:
     """Pull assessable text from governed request arguments."""
     parts: list[str] = []
-    for key in ("text", "content", "prompt", "message", "query", "input", "command", "url", "domain"):
+    for key in (
+        "text",
+        "content",
+        "prompt",
+        "message",
+        "query",
+        "input",
+        "command",
+        "url",
+        "domain",
+    ):
         val = arguments.get(key)
         if isinstance(val, str) and val.strip():
             parts.append(val)

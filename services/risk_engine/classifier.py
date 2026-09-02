@@ -145,15 +145,15 @@ class KeywordMockClassifier(RiskClassifier):
         else:
             level = RiskLevel.LOW
 
-        reasoning_parts = (
-            pharma_reasons
-            or [f"Keyword mock classifier matched: {[c.value for c in categories] or ['NONE']}"]
-        )
+        reasoning_parts = pharma_reasons or [
+            f"Keyword mock classifier matched: {[c.value for c in categories] or ['NONE']}"
+        ]
 
         return RiskAssessment(
             risk_level=level,
             categories=categories or [RiskCategory.NONE],
-            disguise_detected=injection or any(
+            disguise_detected=injection
+            or any(
                 "disguised" in r.lower() or "limited evidence" in r.lower() for r in pharma_reasons
             ),
             injection_detected=injection,
