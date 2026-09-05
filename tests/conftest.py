@@ -62,6 +62,16 @@ os.environ["SERVE_STATIC_FRONTEND"] = "true"
 os.environ["AUTH_DEV_MODE"] = "false"
 os.environ.setdefault("AUTH_JWT_SECRET", "unit-test-signing-secret-0123456789abcdef")
 
+# Google sign-in: client ID and allowlist forced EMPTY so /auth/google fails
+# closed (503/403) in the default suite — the endpoint must never be reachable
+# without explicit operator configuration. Tests that exercise the Google path
+# set GOOGLE_CLIENT_ID / GOOGLE_ALLOWED_* themselves, and /auth/google's
+# success-path scenario monkeypatches the verifier directly.
+os.environ["GOOGLE_CLIENT_ID"] = ""
+os.environ["GOOGLE_ALLOWED_EMAILS"] = ""
+os.environ["GOOGLE_ALLOWED_DOMAINS"] = ""
+os.environ["GOOGLE_DEFAULT_ROLE"] = ""
+
 import pytest  # noqa: E402
 
 from services.auth import mint_dev_token  # noqa: E402

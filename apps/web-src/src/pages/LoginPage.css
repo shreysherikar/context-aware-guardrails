@@ -380,3 +380,37 @@
   0% { transform: translateX(-120%); }
   100% { transform: translateX(320%); }
 }
+/* Google sign-in (Google Identity Services) — divider and button container */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 1.5rem 0 1rem;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-google {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+}
+
+.login-google-note {
+  margin-top: 1.25rem;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}

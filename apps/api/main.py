@@ -65,6 +65,11 @@ from services import auth  # noqa: E402
 from services.agent import GuardrailAgent  # noqa: E402
 from services.agent.models import AgentChatResponse  # noqa: E402
 from services.audit.audit import list_events, log_event  # noqa: E402
+from services.auth.google_auth import (  # noqa: E402
+    default_role_for_email,
+    get_google_verifier,
+    is_email_allowed,
+)
 from services.claim_verification import build_audit_meta  # noqa: E402
 from services.claim_verification.factory import get_claim_verifier  # noqa: E402
 from services.claim_verification.models import unverified_failure_response  # noqa: E402
@@ -144,6 +149,9 @@ sanitization_engine = get_sanitization_engine()
 nemo_input_rail = get_nemo_input_rail()
 nemo_dialog_rail = get_nemo_dialog_rail()
 review_store = get_review_store()
+# Google ID-token sign-in — one verifier per process, bound to GOOGLE_CLIENT_ID
+# at startup. POST /auth/google fails closed (503) while that env var is unset.
+google_verifier = get_google_verifier()
 agent = GuardrailAgent(
     classifier=classifier,
     policy_engine=policy_engine,
@@ -415,6 +423,44 @@ def issue_dev_token(body: DevTokenRequest) -> dict[str, str]:
     except auth.AuthConfigError as exc:
         logger.error("Dev-token issuance misconfigured: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class GoogleTokenRequest(BaseModel):
+    id_token: str
+
+
+@app.post("/auth/google")
+def authenticate_google(body: GoogleTokenRequest) -> dict[str, str]:
+    """Exchange a Google ID token for a context-aware-guardrail session token.
+
+    The Google ID token is verified server-side (signature + audience against
+    GOOGLE_CLIENT_ID + email verification), then the verified email MUST pass
+    the permanent allowlist (GOOGLE_ALLOWED_EMAILS / GOOGLE_ALLOWED_DOMAINS)
+    before any token is minted — this gate is independent of the Google Cloud
+    app's "Testing" status.
+
+    Fail closed: an unconfigured allowlist rejects everyone (403); an
+    unconfigured client ID returns 503 (operator misconfiguration). Rejection
+    reasons and allowlist contents never reach the caller.
+    """
+    try:
+        identity = google_verifier.verify_token(body.id_token)
+    except auth.AuthConfigError as exc:
+        logger.error("Google sign-in is not configured: %s", exc)
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.") from exc
+    except auth.AuthError as exc:
+        logger.warning("Google sign-in rejected: %s", exc)
+        raise _GENERIC_401 from exc
+
+    if not is_email_allowed(identity.email):
+        logger.warning("Google sign-in denied for unlisted account: %s", identity.email)
+        raise HTTPException(
+            status_code=403,
+            detail="This account is not authorized for this application.",
+        )
+
+    role = default_role_for_email(identity.email)
+    return {"token": auth.mint_token(role, subject=identity.email), "role": role}
 
 
 @app.exception_handler(Exception)

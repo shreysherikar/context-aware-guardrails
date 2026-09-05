@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from apps.api import main as _main_module
 from apps.api.main import app
 from services.auth import mint_dev_token
+from services.auth.google_auth import GoogleIdentity
 
 client = TestClient(app)
 
@@ -156,3 +157,74 @@ def test_dev_token_works_and_produces_accepted_token(monkeypatch):
     from services.auth import verify_token
 
     assert verify_token(token) == "clinician"
+
+
+# ---------------------------------------------------------------------------
+# Google ID-token sign-in gated by the permanent allowlist
+# ---------------------------------------------------------------------------
+
+
+def test_google_auth_403_when_email_not_on_allowlist(monkeypatch):
+    """A verified Google identity NOT on the allowlist gets 403 and no token.
+
+    The allowlist is the permanent authorization gate (independent of Google's
+    app "Testing" status) and must fail closed: the response is generic and
+    never echoes the identity or the allowlist contents.
+    """
+    monkeypatch.setenv("GOOGLE_ALLOWED_EMAILS", "allowed@acme.com")
+    monkeypatch.setenv("GOOGLE_ALLOWED_DOMAINS", "")
+
+    def fake_verify(token):
+        return GoogleIdentity(
+            email="blocked@example.com", subject="google-sub-1", email_verified=True
+        )
+
+    monkeypatch.setattr(_main_module.google_verifier, "verify_token", fake_verify)
+
+    resp = client.post("/auth/google", json={"id_token": "any.google.id.token"})
+    assert resp.status_code == 403
+    assert resp.json() == {"detail": "This account is not authorized for this application."}
+    assert "blocked@example.com" not in str(resp.json())
+    assert "token" not in resp.json()
+
+
+def test_google_auth_fails_closed_without_allowlist(monkeypatch):
+    """Even a valid, verified Google identity gets 403 when no allowlist is set."""
+    monkeypatch.setenv("GOOGLE_ALLOWED_EMAILS", "")
+    monkeypatch.setenv("GOOGLE_ALLOWED_DOMAINS", "")
+
+    def fake_verify(token):
+        return GoogleIdentity(email="alice@acme.com", subject="google-sub-2", email_verified=True)
+
+    monkeypatch.setattr(_main_module.google_verifier, "verify_token", fake_verify)
+
+    resp = client.post("/auth/google", json={"id_token": "any.google.id.token"})
+    assert resp.status_code == 403
+    assert "token" not in resp.json()
+
+
+def test_google_auth_allowed_email_receives_usable_token(monkeypatch):
+    """An allowlisted, verified Google email receives a normal session token."""
+    monkeypatch.setenv("GOOGLE_ALLOWED_EMAILS", "alice@acme.com")
+    monkeypatch.setenv("GOOGLE_ALLOWED_DOMAINS", "")
+
+    def fake_verify(token):
+        return GoogleIdentity(email="Alice@Acme.com", subject="google-sub-3", email_verified=True)
+
+    monkeypatch.setattr(_main_module.google_verifier, "verify_token", fake_verify)
+
+    resp = client.post("/auth/google", json={"id_token": "any.google.id.token"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["role"] == "employee"
+
+    # the returned token is one of our own HS256 tokens, accepted everywhere
+    from services.auth import verify_token
+
+    assert verify_token(body["token"]) == "employee"
+
+
+def test_google_auth_503_when_client_id_unconfigured():
+    """GOOGLE_CLIENT_ID unset (conftest default): /auth/google fails closed to 503."""
+    resp = client.post("/auth/google", json={"id_token": "any.google.id.token"})
+    assert resp.status_code == 503

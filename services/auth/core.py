@@ -80,8 +80,18 @@ def _validate_role(role: Any) -> str:
     return stripped
 
 
-def mint_dev_token(role: str, expires_in_seconds: int = DEFAULT_TOKEN_TTL_SECONDS) -> str:
-    """Sign an HS256 token carrying the given role. Dev/test issuance path."""
+def mint_token(
+    role: str,
+    *,
+    subject: str | None = None,
+    expires_in_seconds: int = DEFAULT_TOKEN_TTL_SECONDS,
+) -> str:
+    """Sign an HS256 token carrying the given role and optional subject.
+
+    This is the single minting path for every token this service issues: dev
+    tokens and IdP-verified tokens alike. The optional ``subject`` claim carries
+    the verified caller identity (e.g. a Google email) when it is known.
+    """
     validated = _validate_role(role)
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
@@ -89,7 +99,16 @@ def mint_dev_token(role: str, expires_in_seconds: int = DEFAULT_TOKEN_TTL_SECOND
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(seconds=expires_in_seconds)).timestamp()),
     }
+    if subject is not None:
+        if not isinstance(subject, str) or not subject.strip():
+            raise AuthError("subject claim must be a non-empty string")
+        payload["sub"] = subject.strip()
     return jwt.encode(payload, _get_secret(), algorithm="HS256")
+
+
+def mint_dev_token(role: str, expires_in_seconds: int = DEFAULT_TOKEN_TTL_SECONDS) -> str:
+    """Sign an HS256 token carrying the given role. Dev/test issuance path."""
+    return mint_token(role, expires_in_seconds=expires_in_seconds)
 
 
 def verify_token(token: str) -> str:
