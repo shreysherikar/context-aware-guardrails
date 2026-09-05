@@ -34,7 +34,8 @@ to `localhost:8000` — no CORS changes needed on the backend.
 cd apps/web-src
 npm run build
 # → Compiled output written to apps/web/ (emptyOutDir: true)
-# FastAPI's existing StaticFiles mount at GET / serves it automatically.
+# With SERVE_STATIC_FRONTEND=true, FastAPI's StaticFiles mount at GET / serves
+# it. Off by default — the frontend is deployed separately on S3/CloudFront.
 ```
 
 After building, start the backend and visit `http://localhost:8000/` — the

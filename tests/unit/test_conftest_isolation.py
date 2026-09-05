@@ -32,3 +32,18 @@ def test_output_guardrail_provider_is_forced_off_in_test_process():
 def test_optical_ocr_provider_defaults_to_mock_in_test_process():
     # Optical OCR must stay offline in CI; a local .env may set tesseract.
     assert os.environ.get("OPTICAL_OCR_PROVIDER", "").strip().lower() == "mock"
+
+
+def test_allowed_origins_is_forced_in_test_process():
+    # CORS tests assert on exactly this allowlist; a local .env with
+    # ALLOWED_ORIGINS set could otherwise change middleware behaviour mid-suite
+    # (or worse, hide a failure to restrict cross-origin access).
+    assert os.environ.get("ALLOWED_ORIGINS", "").strip() == (
+        "https://d123abc.cloudfront.net,http://localhost:5173"
+    )
+
+
+def test_serve_static_frontend_is_forced_true_in_test_process():
+    # The static-mount gate defaults to off in real deployments; conftest must
+    # override that so the existing web_ui static-mount coverage stays active.
+    assert os.environ.get("SERVE_STATIC_FRONTEND", "").strip().lower() == "true"

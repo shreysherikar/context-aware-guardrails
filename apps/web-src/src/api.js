@@ -2,7 +2,7 @@
  * Centralized API client.
  *
  * Attaches Authorization: Bearer <token> when present, centralizes base URL
- * (empty string / same-origin in production, proxied in dev via vite.config),
+ * (VITE_API_BASE_URL when set, otherwise same-origin; proxied in dev via vite.config),
  * and normalizes error handling into a consistent shape components can render.
  */
 
@@ -27,6 +27,7 @@
  * @throws {ApiError}
  */
 export async function apiFetch(path, { method = 'GET', body = null, token = null, headers = null } = {}) {
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
   const hdrs = { ...(headers || {}) };
   if (token) hdrs['Authorization'] = `Bearer ${token}`;
   if (body && !(body instanceof FormData)) {
@@ -35,7 +36,7 @@ export async function apiFetch(path, { method = 'GET', body = null, token = null
 
   let res;
   try {
-    res = await fetch(path, {
+    res = await fetch(`${baseUrl}${path}`, {
       method,
       headers: hdrs,
       body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,

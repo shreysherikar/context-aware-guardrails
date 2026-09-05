@@ -40,6 +40,7 @@ from fastapi import (  # noqa: E402
     Request,
     UploadFile,
 )
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -100,6 +101,30 @@ logger = logging.getLogger(__name__)
 auth.ensure_startup_requirements()
 
 app = FastAPI(title="Context-Aware Guardrail", version="0.2.0")
+
+# CORS: the API authenticates callers via verified bearer tokens, so browser
+# cross-origin access is allowlisted explicitly — never "*" (wildcard origins
+# with credentials are both insecure and rejected by browsers anyway).
+# ALLOWED_ORIGINS is a comma-separated list, e.g.
+# "https://d123abc.cloudfront.net,http://localhost:5173". Unset/empty = no
+# cross-origin browser access; non-browser clients (curl, other services) are
+# unaffected.
+_allowed_origins = [
+    origin.strip() for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",") if origin.strip()
+]
+if "*" in _allowed_origins:
+    raise RuntimeError(
+        "ALLOWED_ORIGINS must not contain '*': wildcard origins with "
+        "allow_credentials=True are rejected by browsers and insecure for a "
+        "bearer-token API."
+    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 # Always-active governance runtime — starts at import, independent of agent sessions.
 governance_runtime = get_runtime()
@@ -1411,8 +1436,12 @@ def list_audit_events(
 
 
 # Static ContextGuard dashboard (apps/web). Mounted LAST so API routes win.
+# Off by default: the frontend is deployed separately on S3/CloudFront. This
+# same-origin mount only activates when SERVE_STATIC_FRONTEND=true AND a built
+# bundle exists under apps/web. Kept (not deleted) — still useful for local dev
+# and all-in-one hosting.
 _WEB_DIR = Path(__file__).resolve().parents[1] / "web"
-if _WEB_DIR.is_dir():
+if os.environ.get("SERVE_STATIC_FRONTEND", "false").strip().lower() == "true" and _WEB_DIR.is_dir():
     app.mount(
         "/",
         StaticFiles(directory=_WEB_DIR, html=True),

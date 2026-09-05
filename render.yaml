@@ -16,6 +16,11 @@
 #   LLM_GENERATION_PROVIDER=groq               (OPTIONAL — see comment below)
 #   GROQ_API_KEY=<key>                          (OPTIONAL — set WITH provider)
 #   GROQ_MODEL=openai/gpt-oss-20b
+#   ALLOWED_ORIGINS=<unset>          (same-origin deployment: leave unset — the
+#                                     dashboard talks to S3/CloudFront; if the
+#                                     API needs browser access list the origins)
+#   SERVE_STATIC_FRONTEND=true       (same-origin hosting: this service serves
+#                                     the built apps/web dashboard at /)
 #
 # IMPORTANT: LLM_GENERATION_PROVIDER=groq WITHOUT a GROQ_API_KEY crashes the app
 # at startup — the Groq client validates the key when the gateway is constructed
@@ -51,3 +56,7 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: openai/gpt-oss-20b
+      # Same-origin demo hosting: serve the built dashboard at /. The default is
+      # now off, since the frontend is deployed separately on S3/CloudFront.
+      - key: SERVE_STATIC_FRONTEND
+        value: "true"

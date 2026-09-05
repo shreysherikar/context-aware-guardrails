@@ -47,6 +47,14 @@ os.environ.setdefault("AGENT_LLM_FEEDBACK", "false")
 # verify the PostgreSQL path can still monkeypatch.setenv("DATABASE_URL", ...).
 os.environ["DATABASE_URL"] = ""
 
+# CORS/static-mount determinism: force a fixed browser allowlist (the CORS tests
+# assert on exactly these origins) and keep the same-origin static mount active
+# (existing web_ui coverage). Forced, not setdefault, so a local .env cannot
+# change observable app behaviour mid-suite; tests covering the off-by-default
+# mount gate spawn a fresh subprocess instead (see tests/scenarios/test_web_ui.py).
+os.environ["ALLOWED_ORIGINS"] = "https://d123abc.cloudfront.net,http://localhost:5173"
+os.environ["SERVE_STATIC_FRONTEND"] = "true"
+
 # Auth bootstrap: dev mode off (safe default), test signing secret on. Forced
 # (not setdefault) for DEV_MODE so a local .env cannot flip it on and change
 # which endpoints exist during a test run. The secret is >=32 bytes so HMAC-SHA256
