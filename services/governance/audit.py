@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
-import sqlite3
 import uuid
 from pathlib import Path
 
 from domain.governance_models import GovernanceAuditRecord
+from services import db
 
 DB_PATH = Path(__file__).resolve().parents[2] / "governance_audit.db"
 
@@ -19,9 +19,12 @@ class GovernanceAuditStore:
         self._db_path = db_path or Path(os.getenv("GOVERNANCE_AUDIT_DB_PATH", str(DB_PATH)))
         self._ensure_schema()
 
-    def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self._db_path)
-        conn.execute("PRAGMA journal_mode=WAL")
+    def _get_conn(self) -> db.Connection:
+        conn = db.get_connection(self._db_path)
+        if not db.is_postgres():
+            # PRAGMA journal_mode is SQLite-only; in PostgreSQL mode the shared
+            # database handles durability itself.
+            conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
     def _ensure_schema(self) -> None:

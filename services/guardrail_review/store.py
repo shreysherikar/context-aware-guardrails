@@ -1,14 +1,18 @@
-"""SQLite-backed store for evaluation snapshots, review requests, and decision reports."""
+"""Store for evaluation snapshots, review requests, and decision reports.
+
+SQLite local fallback by default; when DATABASE_URL is set the three tables live
+in the shared PostgreSQL database (services/db.py).
+"""
 
 from __future__ import annotations
 
 import os
-import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 from domain.enums import PolicyAction, ReviewRequestStatus
+from services import db
 from services.guardrail_review.models import (
     DecisionReport,
     EvaluationSnapshot,
@@ -18,76 +22,105 @@ from services.guardrail_review.models import (
 DB_PATH = Path(__file__).resolve().parents[2] / "guardrail_review.db"
 
 
-def _get_conn() -> sqlite3.Connection:
+_CREATE_EVALUATION_SNAPSHOTS = """
+CREATE TABLE IF NOT EXISTS evaluation_snapshots (
+    request_id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    user_role TEXT NOT NULL,
+    effective_decision TEXT NOT NULL,
+    policy_action TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    input_type TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
+_CREATE_REVIEW_REQUESTS = """
+CREATE TABLE IF NOT EXISTS review_requests (
+    review_request_id TEXT PRIMARY KEY,
+    evaluation_request_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    user_role TEXT NOT NULL,
+    effective_decision TEXT NOT NULL,
+    status TEXT NOT NULL,
+    note TEXT,
+    approver TEXT,
+    outcome TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)
+"""
+
+_CREATE_DECISION_REPORTS = """
+CREATE TABLE IF NOT EXISTS decision_reports (
+    report_id TEXT PRIMARY KEY,
+    evaluation_request_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    user_role TEXT NOT NULL,
+    comment TEXT,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
+
+def _get_conn() -> db.Connection:
+    # GUARDRAIL_REVIEW_DB_PATH is read per connection so the location is
+    # configurable (e.g. a volume path in Docker) without code changes. When
+    # DATABASE_URL is set the shared PostgreSQL database replaces the local
+    # file entirely.
     db_path = Path(os.getenv("GUARDRAIL_REVIEW_DB_PATH", str(DB_PATH)))
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS evaluation_snapshots (
-            request_id TEXT PRIMARY KEY,
-            conversation_id TEXT NOT NULL,
-            user_role TEXT NOT NULL,
-            effective_decision TEXT NOT NULL,
-            policy_action TEXT NOT NULL,
-            prompt TEXT NOT NULL,
-            input_type TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS review_requests (
-            review_request_id TEXT PRIMARY KEY,
-            evaluation_request_id TEXT NOT NULL,
-            conversation_id TEXT NOT NULL,
-            user_role TEXT NOT NULL,
-            effective_decision TEXT NOT NULL,
-            status TEXT NOT NULL,
-            note TEXT,
-            approver TEXT,
-            outcome TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS decision_reports (
-            report_id TEXT PRIMARY KEY,
-            evaluation_request_id TEXT NOT NULL,
-            conversation_id TEXT NOT NULL,
-            user_role TEXT NOT NULL,
-            comment TEXT,
-            status TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
+    conn = db.get_connection(db_path)
+    conn.execute(_CREATE_EVALUATION_SNAPSHOTS)
+    conn.execute(_CREATE_REVIEW_REQUESTS)
+    conn.execute(_CREATE_DECISION_REPORTS)
+    if db.is_postgres():
+        # PostgreSQL DDL is transactional: persist the schema so the next
+        # (separate) connection sees it. SQLite auto-commits DDL as today.
+        conn.commit()
     return conn
 
 
 class GuardrailReviewStore:
     def save_evaluation(self, snapshot: EvaluationSnapshot) -> None:
+        params = (
+            snapshot.request_id,
+            snapshot.conversation_id,
+            snapshot.user_role,
+            snapshot.effective_decision.value,
+            snapshot.policy_action.value,
+            snapshot.prompt,
+            snapshot.input_type,
+            snapshot.created_at.isoformat(),
+        )
         conn = _get_conn()
         try:
-            conn.execute(
-                """INSERT OR REPLACE INTO evaluation_snapshots
-                   (request_id, conversation_id, user_role, effective_decision,
-                    policy_action, prompt, input_type, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    snapshot.request_id,
-                    snapshot.conversation_id,
-                    snapshot.user_role,
-                    snapshot.effective_decision.value,
-                    snapshot.policy_action.value,
-                    snapshot.prompt,
-                    snapshot.input_type,
-                    snapshot.created_at.isoformat(),
-                ),
-            )
+            if db.is_postgres():
+                # PostgreSQL has no INSERT OR REPLACE; ON CONFLICT updates the
+                # existing row with the snapshot's (same-PK) values.
+                conn.execute(
+                    """INSERT INTO evaluation_snapshots
+                       (request_id, conversation_id, user_role, effective_decision,
+                        policy_action, prompt, input_type, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT (request_id) DO UPDATE SET
+                           conversation_id = EXCLUDED.conversation_id,
+                           user_role = EXCLUDED.user_role,
+                           effective_decision = EXCLUDED.effective_decision,
+                           policy_action = EXCLUDED.policy_action,
+                           prompt = EXCLUDED.prompt,
+                           input_type = EXCLUDED.input_type,
+                           created_at = EXCLUDED.created_at""",
+                    params,
+                )
+            else:
+                conn.execute(
+                    """INSERT OR REPLACE INTO evaluation_snapshots
+                       (request_id, conversation_id, user_role, effective_decision,
+                        policy_action, prompt, input_type, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    params,
+                )
             conn.commit()
         finally:
             conn.close()

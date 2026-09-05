@@ -3,13 +3,13 @@ Audit log (services/audit).
 
 Every request — regardless of outcome — is logged here. This is a
 protected data asset in its own right (it will contain the same PII/PHI
-that appears in flagged prompts), so treat access to audit.db accordingly.
-Swap sqlite3 for a production database when the production/security layer
-is built without touching callers — they only ever call log_event().
+that appears in flagged prompts), so treat access accordingly. By default
+the log lives in audit.db (SQLite); set DATABASE_URL to back this module —
+and the other storage modules — with a shared PostgreSQL database instead.
+Callers only ever call log_event().
 """
 
 import os
-import sqlite3
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +23,7 @@ from domain.models import (
     RiskAssessment,
     SanitizationAuditMeta,
 )
+from services import db
 
 DB_PATH = Path(__file__).resolve().parents[2] / "audit.db"
 
@@ -54,51 +55,87 @@ _AUDIT_SELECT = """SELECT conversation_id, prompt, user_role, risk_assessment,
                    FROM audit_log"""
 
 
-def _add_missing_columns(conn: sqlite3.Connection) -> None:
+_AUDIT_CREATE_SQLITE = """
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    user_role TEXT NOT NULL,
+    risk_assessment TEXT NOT NULL,
+    policy_decision TEXT NOT NULL,
+    llm TEXT,
+    output_guardrail TEXT,
+    optical TEXT,
+    sanitization TEXT,
+    claim_verification TEXT,
+    request_id TEXT,
+    resolution_type TEXT,
+    forwarded_to_llm INTEGER,
+    sanitization_occurred INTEGER,
+    human_review_requested INTEGER,
+    human_review_outcome TEXT,
+    report_status TEXT,
+    timestamp TEXT NOT NULL
+)
+"""
+
+# Same columns as the SQLite schema; only the id generation syntax differs
+# (SERIAL == INTEGER PRIMARY KEY AUTOINCREMENT). TEXT/INTEGER are valid on both.
+_AUDIT_CREATE_PG = """
+CREATE TABLE IF NOT EXISTS audit_log (
+    id SERIAL PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    user_role TEXT NOT NULL,
+    risk_assessment TEXT NOT NULL,
+    policy_decision TEXT NOT NULL,
+    llm TEXT,
+    output_guardrail TEXT,
+    optical TEXT,
+    sanitization TEXT,
+    claim_verification TEXT,
+    request_id TEXT,
+    resolution_type TEXT,
+    forwarded_to_llm INTEGER,
+    sanitization_occurred INTEGER,
+    human_review_requested INTEGER,
+    human_review_outcome TEXT,
+    report_status TEXT,
+    timestamp TEXT NOT NULL
+)
+"""
+
+
+def _add_missing_columns(conn: db.Connection) -> None:
     """Add any expected audit_log columns that are missing (idempotent).
 
     CREATE TABLE IF NOT EXISTS is a no-op against an already-existing table, so
     databases created before a column was introduced would otherwise fail on
-    every insert. The PRAGMA check is cheap; ALTER TABLE runs only for columns
-    that are actually absent.
+    every insert. Existing columns are checked cheaply on every connection open
+    (PRAGMA table_info on SQLite, information_schema on PostgreSQL) and ALTER
+    TABLE runs only for columns that are actually absent.
     """
-    existing = {row[1] for row in conn.execute("PRAGMA table_info(audit_log)")}
+    existing = db.existing_columns(conn, "audit_log")
     for name, column_type in _COLUMNS_TO_MIGRATE:
         if name not in existing:
             conn.execute(f"ALTER TABLE audit_log ADD COLUMN {name} {column_type}")
 
 
-def _get_conn() -> sqlite3.Connection:
+def _get_conn() -> db.Connection:
     # AUDIT_DB_PATH is read per connection so the location is configurable
-    # (e.g. a volume path in Docker) without code changes.
+    # (e.g. a volume path in Docker) without code changes. When DATABASE_URL is
+    # set the shared PostgreSQL database replaces the local file entirely.
     db_path = Path(os.getenv("AUDIT_DB_PATH", str(DB_PATH)))
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id TEXT NOT NULL,
-            prompt TEXT NOT NULL,
-            user_role TEXT NOT NULL,
-            risk_assessment TEXT NOT NULL,
-            policy_decision TEXT NOT NULL,
-            llm TEXT,
-            output_guardrail TEXT,
-            optical TEXT,
-            sanitization TEXT,
-            claim_verification TEXT,
-            request_id TEXT,
-            resolution_type TEXT,
-            forwarded_to_llm INTEGER,
-            sanitization_occurred INTEGER,
-            human_review_requested INTEGER,
-            human_review_outcome TEXT,
-            report_status TEXT,
-            timestamp TEXT NOT NULL
-        )
-        """
-    )
-    _add_missing_columns(conn)
+    conn = db.get_connection(db_path)
+    if db.is_postgres():
+        # PostgreSQL DDL is transactional: persist CREATE TABLE / ALTER TABLE so
+        # the next (separate) connection sees them.
+        conn.execute(_AUDIT_CREATE_PG)
+        _add_missing_columns(conn)
+        conn.commit()
+    else:
+        conn.execute(_AUDIT_CREATE_SQLITE)
+        _add_missing_columns(conn)
     return conn
 
 

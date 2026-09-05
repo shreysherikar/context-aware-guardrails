@@ -38,6 +38,15 @@ os.environ.setdefault("CLAIM_VERIFICATION_PROVIDER", "")
 os.environ.setdefault("OPTICAL_OCR_PROVIDER", "mock")
 os.environ.setdefault("AGENT_LLM_FEEDBACK", "false")
 
+# Storage isolation: the persistence modules (services/audit, services/governance,
+# services/guardrail_review) switch to PostgreSQL whenever DATABASE_URL is set, and
+# apps/api/main.py's load_dotenv() would otherwise inject a developer's local .env
+# DATABASE_URL into the test process. Forced (not setdefault) so an exported
+# DATABASE_URL cannot flip the suite onto a real network database either — tests
+# must stay deterministic and offline on the per-test SQLite files. Tests that
+# verify the PostgreSQL path can still monkeypatch.setenv("DATABASE_URL", ...).
+os.environ["DATABASE_URL"] = ""
+
 # Auth bootstrap: dev mode off (safe default), test signing secret on. Forced
 # (not setdefault) for DEV_MODE so a local .env cannot flip it on and change
 # which endpoints exist during a test run. The secret is >=32 bytes so HMAC-SHA256
