@@ -39,6 +39,7 @@ from fastapi import (  # noqa: E402
     Request,
     UploadFile,
 )
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -92,6 +93,13 @@ logger = logging.getLogger(__name__)
 auth.ensure_startup_requirements()
 
 app = FastAPI(title="Context-Aware Guardrail", version="0.2.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Always-active governance runtime — starts at import, independent of agent sessions.
 governance_runtime = get_runtime()

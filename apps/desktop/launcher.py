@@ -10,7 +10,12 @@ import webbrowser
 from pathlib import Path
 
 from apps.desktop.paths import bundle_root, ensure_user_data_dir
-from apps.desktop.runtime import configure_desktop_environment, pick_port, wait_for_health
+from apps.desktop.runtime import (
+    configure_desktop_environment,
+    lan_ipv4_addresses,
+    pick_port,
+    wait_for_health,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,7 @@ def _run_server(port: int) -> None:
 
         config = uvicorn.Config(
             app,
-            host="127.0.0.1",
+            host="0.0.0.0",
             port=port,
             log_level="warning",
             log_config=None,
@@ -93,7 +98,10 @@ def main() -> int:
         thread.start()
         wait_for_health(port)
         url = f"http://127.0.0.1:{port}/"
+        phone_urls = [f"http://{ip}:{port}/" for ip in lan_ipv4_addresses()]
         logger.info("ContextGuard is running at %s", url)
+        for phone in phone_urls:
+            logger.info("Phone URL: %s", phone)
 
         try:
             import webview
@@ -103,8 +111,11 @@ def main() -> int:
             thread.join()
             return 0
 
+        title = "ContextGuard"
+        if phone_urls:
+            title = f"ContextGuard — phone {phone_urls[0]}"
         webview.create_window(
-            "ContextGuard",
+            title,
             url,
             width=1280,
             height=840,

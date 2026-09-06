@@ -14,6 +14,37 @@
  * @property {Object|null} body   - Parsed JSON body from the server, if any
  */
 
+const STORAGE_KEY = 'contextguard-api-base';
+
+export function isNativeApp() {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.Capacitor?.isNativePlatform?.());
+}
+
+export function getApiBase() {
+  try {
+    return (localStorage.getItem(STORAGE_KEY) || '').replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+export function setApiBase(base) {
+  const cleaned = (base || '').trim().replace(/\/$/, '');
+  try {
+    if (cleaned) localStorage.setItem(STORAGE_KEY, cleaned);
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function apiUrl(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const base = getApiBase();
+  return base ? `${base}${normalized}` : normalized;
+}
+
 /**
  * Make a JSON API call.
  *
@@ -35,7 +66,7 @@ export async function apiFetch(path, { method = 'GET', body = null, token = null
 
   let res;
   try {
-    res = await fetch(path, {
+    res = await fetch(apiUrl(path), {
       method,
       headers: hdrs,
       body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,

@@ -10,6 +10,13 @@ then send a prompt or one of the example buttons. No Python install is required.
 The app talks to your local **Llama** through Ollama (`llama3.2:3b`). Keep
 `ollama serve` running before you open the exe.
 
+## Mobile app
+
+Install **app-debug.apk** from the same Releases page (Android sideload), or open
+the **phone URL** from the desktop window title on the same Wi-Fi and choose
+**Add to Home Screen**. On first launch, set **Server** to that URL so the phone
+can reach Llama on your PC.
+
 Optional: place a `.env` file next to the exe to override the model or switch
 providers. Logs and the audit database live in `%LOCALAPPDATA%\ContextGuard`.
 

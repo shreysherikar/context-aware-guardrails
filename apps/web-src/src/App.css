@@ -3,12 +3,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #root { height: 100%; }
+html, body, #root {
+  height: 100%;
+  height: 100dvh;
+}
 body {
   background: var(--bg-page);
   color: var(--text-primary);
   font: 400 13.5px/1.5 var(--font);
   -webkit-font-smoothing: antialiased;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 code, pre { font-family: var(--mono); font-size: 12px; }
@@ -1765,8 +1769,64 @@ select { cursor: pointer; }
 }
 .fade-in { animation: fade-in 0.18s ease; }
 
+.menu-backdrop {
+  display: none;
+}
+
+.mobile-menu-fab {
+  display: none;
+}
+
 @media (max-width: 900px) {
-  .app-shell { grid-template-columns: 1fr; }
+  .app-shell,
+  .app-shell--landing,
+  .app-shell--landing.menu-open {
+    grid-template-columns: 1fr;
+    --sidebar-w: 0px;
+  }
+  .menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    border: 0;
+    background: rgba(8, 12, 20, 0.45);
+  }
+  .mobile-menu-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: calc(10px + env(safe-area-inset-top));
+    left: calc(10px + env(safe-area-inset-left));
+    z-index: 90;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  }
+  .mobile-menu-fab img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+  .sidebar--expandable {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 102;
+    width: min(280px, 86vw);
+    transform: translateX(-100%);
+    transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sidebar--expandable.is-expanded,
+  .app-shell--landing.menu-open .sidebar--expandable {
+    transform: translateX(0);
+  }
   .sidebar {
     position: relative;
     height: auto;

@@ -59,15 +59,29 @@ def _set_if_blank(name: str, value: str) -> None:
         os.environ[name] = value
 
 
-def pick_port(preferred: int = DEFAULT_PORT) -> int:
+def pick_port(preferred: int = DEFAULT_PORT, host: str = "0.0.0.0") -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            sock.bind(("127.0.0.1", preferred))
+            sock.bind((host, preferred))
             return preferred
         except OSError:
-            sock.bind(("127.0.0.1", 0))
+            sock.bind((host, 0))
             return int(sock.getsockname()[1])
+
+
+def lan_ipv4_addresses() -> list[str]:
+    """Best-effort LAN addresses a phone on the same Wi-Fi can reach."""
+    ips: list[str] = []
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            sock.connect(("8.8.8.8", 80))
+            ip = sock.getsockname()[0]
+            if ip and not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+        except OSError:
+            pass
+    return ips
 
 
 def wait_for_health(port: int, timeout: float = HEALTH_TIMEOUT_SECONDS) -> None:

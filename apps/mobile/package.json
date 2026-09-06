@@ -1,0 +1,16 @@
+{
+  "name": "contextguard-mobile",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Capacitor Android wrapper for ContextGuard",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/core": "^7.4.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3"
+  }
+}

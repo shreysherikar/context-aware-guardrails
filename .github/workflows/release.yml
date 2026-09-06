@@ -33,3 +33,39 @@ jobs:
           files: ContextGuard-windows-x64.zip
           prerelease: true
           generate_release_notes: true
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Build web UI
+        working-directory: apps/web-src
+        run: |
+          npm ci
+          npm run build
+      - name: Sync Capacitor Android project
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npx cap add android
+          npx cap sync
+      - name: Assemble debug APK
+        working-directory: apps/mobile/android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContextGuard-android-debug
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Attach APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: true

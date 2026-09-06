@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { apiUrl } from '../api';
 
 /**
  * Live health indicator. Polls GET /health every 15 s.
@@ -14,7 +15,7 @@ export default function HealthDot({ withLabel = false }) {
 
     async function check() {
       try {
-        const res = await fetch('/health', { cache: 'no-store' });
+        const res = await fetch(apiUrl('/health'), { cache: 'no-store' });
         if (!cancelled) setOk(res.ok);
       } catch {
         if (!cancelled) setOk(false);

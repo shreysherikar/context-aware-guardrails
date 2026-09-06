@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiFetch } from '../api';
+import { apiFetch, getApiBase, isNativeApp, setApiBase } from '../api';
 import { Sun, Moon } from 'lucide-react';
 import LoginBrandPanel from '../components/login/LoginBrandPanel';
 import LoginPanelDecor from '../components/login/LoginPanelDecor';
@@ -17,13 +17,16 @@ export default function LoginPage() {
   const { auth, login } = useAuth();
   const { resolved, toggleTheme } = useTheme();
   const [role, setRole] = useState('');
+  const [serverUrl, setServerUrl] = useState(() => getApiBase());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const native = isNativeApp();
 
   async function handleSubmit(e) {
     e.preventDefault();
     const r = role.trim();
     if (!r) return;
+    setApiBase(serverUrl);
     setLoading(true);
     setError(null);
     try {
@@ -81,6 +84,26 @@ export default function LoginPage() {
           <span className="login-form-rule" aria-hidden="true" />
 
           <form className="login-form" onSubmit={handleSubmit}>
+            <div className="login-field">
+              <label htmlFor="login-server">Server</label>
+              <input
+                id="login-server"
+                type="text"
+                value={serverUrl}
+                onChange={(e) => setServerUrl(e.target.value)}
+                placeholder={native ? 'http://192.168.1.10:18765' : 'Leave blank on this computer'}
+                autoComplete="off"
+                spellCheck="false"
+                inputMode="url"
+              />
+            </div>
+            {native && (
+              <p className="login-server-hint">
+                Use the phone URL shown in the desktop app title. This PC must be running
+                ContextGuard on the same Wi-Fi.
+              </p>
+            )}
+
             <div className="login-field">
               <label htmlFor="login-role">Role</label>
               <input

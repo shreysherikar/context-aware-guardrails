@@ -1,0 +1,12 @@
+{
+  "appId": "ai.contextguard.app",
+  "appName": "ContextGuard",
+  "webDir": "../web",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}

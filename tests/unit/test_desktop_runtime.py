@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from apps.desktop.paths import persist_jwt_secret, user_data_dir
-from apps.desktop.runtime import configure_desktop_environment, pick_port
+from apps.desktop.runtime import configure_desktop_environment, lan_ipv4_addresses, pick_port
 
 
 def test_persist_jwt_secret_reuses_existing_file(tmp_path):
@@ -57,3 +57,9 @@ def test_configure_desktop_environment_sets_writable_paths(monkeypatch, tmp_path
 def test_pick_port_returns_open_localhost_port():
     port = pick_port()
     assert 1 <= port <= 65535
+
+
+def test_lan_ipv4_addresses_returns_a_list():
+    ips = lan_ipv4_addresses()
+    assert isinstance(ips, list)
+    assert all(isinstance(ip, str) and ip.count(".") == 3 for ip in ips)
