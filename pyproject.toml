@@ -1,6 +1,6 @@
 [project]
 name = "context-aware-guardrail"
-version = "0.1.0"
+version = "0.2.0"
 description = "Context-aware adaptive AI guardrail for risk detection and policy enforcement."
 requires-python = ">=3.11"
 dependencies = [
@@ -28,6 +28,9 @@ optical-tesseract = [
 ]
 nemo = [
     "nemoguardrails>=0.11",
+]
+desktop = [
+    "pywebview>=5.0",
 ]
 
 [build-system]
@@ -62,4 +65,8 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.4",
     "types-PyYAML",
+]
+
+package = [
+    "pyinstaller>=6.13",
 ]

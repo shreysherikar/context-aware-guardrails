@@ -127,6 +127,23 @@ export default function App() {
 
   return (
     <div className={`app-shell app-shell--landing${menuOpen ? ' menu-open' : ''}`}>
+      {menuOpen ? (
+        <button
+          type="button"
+          className="menu-backdrop"
+          aria-label="Close menu"
+          onClick={closeMenu}
+        />
+      ) : (
+        <button
+          type="button"
+          className="mobile-menu-fab"
+          aria-label="Open menu"
+          onClick={toggleMenu}
+        >
+          <img src={sidebarLogo} alt="" />
+        </button>
+      )}
       <aside
         id="app-menu-drawer"
         className={`sidebar sidebar--expandable${menuOpen ? ' is-expanded' : ''}`}

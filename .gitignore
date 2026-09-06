@@ -9,6 +9,10 @@ __pycache__/
 *.egg-info/
 .DS_Store
 node_modules/
+dist/
+build/
+apps/mobile/android/
+apps/mobile/ios/
 .design-ref/
 *.blend1
 Context_Aware_AI_Guardrail_Proposal.md

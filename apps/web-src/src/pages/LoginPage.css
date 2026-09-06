@@ -267,6 +267,13 @@
   box-shadow: var(--focus-ring);
 }
 
+.login-server-hint {
+  margin: -0.35rem 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .login-chip-row {
   display: flex;
   flex-wrap: wrap;

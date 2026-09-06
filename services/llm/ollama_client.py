@@ -57,9 +57,10 @@ def chat(
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout or _timeout()) as response:
+        with opener.open(request, timeout=timeout or _timeout()) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")

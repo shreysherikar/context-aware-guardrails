@@ -2,8 +2,9 @@
  * Centralized API client.
  *
  * Attaches Authorization: Bearer <token> when present, centralizes base URL
- * (VITE_API_BASE_URL when set, otherwise same-origin; proxied in dev via vite.config),
- * and normalizes error handling into a consistent shape components can render.
+ * (localStorage override, then VITE_API_BASE_URL, otherwise same-origin;
+ * proxied in dev via vite.config), and normalizes error handling into a
+ * consistent shape components can render.
  */
 
 /**
@@ -13,6 +14,39 @@
  * @property {string} type        - 'network' | 'auth' | 'validation' | 'server' | 'unavailable'
  * @property {Object|null} body   - Parsed JSON body from the server, if any
  */
+
+const STORAGE_KEY = 'contextguard-api-base';
+
+export function isNativeApp() {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.Capacitor?.isNativePlatform?.());
+}
+
+export function getApiBase() {
+  try {
+    return (localStorage.getItem(STORAGE_KEY) || '').replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+export function setApiBase(base) {
+  const cleaned = (base || '').trim().replace(/\/$/, '');
+  try {
+    if (cleaned) localStorage.setItem(STORAGE_KEY, cleaned);
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function apiUrl(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const stored = getApiBase();
+  const envBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+  const base = stored || envBase;
+  return base ? `${base}${normalized}` : normalized;
+}
 
 /**
  * Make a JSON API call.
@@ -27,7 +61,6 @@
  * @throws {ApiError}
  */
 export async function apiFetch(path, { method = 'GET', body = null, token = null, headers = null } = {}) {
-  const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
   const hdrs = { ...(headers || {}) };
   if (token) hdrs['Authorization'] = `Bearer ${token}`;
   if (body && !(body instanceof FormData)) {
@@ -36,7 +69,7 @@ export async function apiFetch(path, { method = 'GET', body = null, token = null
 
   let res;
   try {
-    res = await fetch(`${baseUrl}${path}`, {
+    res = await fetch(apiUrl(path), {
       method,
       headers: hdrs,
       body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
