@@ -1,5 +1,18 @@
 # ContextGuard AI
 
+## Desktop app (Windows)
+
+Download **ContextGuard-windows-x64.zip** from
+[Releases](https://github.com/shreysherikar/context-aware-guardrails/releases),
+unzip it, and double-click `ContextGuard.exe`. Pick a role, click **Start session**,
+then send a prompt or one of the example buttons. No Python install is required.
+
+Optional: place a `.env` file next to the exe (for example `GROQ_API_KEY` and
+`LLM_GENERATION_PROVIDER=groq`) if you want live generated answers. Logs and the
+audit database live in `%LOCALAPPDATA%\ContextGuard`.
+
+From source: `uv sync --extra desktop` then `uv run python -m apps.desktop`.
+
 ## Live demo
 
 Open the hosted demo (no clone or install needed): **<https://YOUR-DEPLOYED-URL.onrender.com>** —
