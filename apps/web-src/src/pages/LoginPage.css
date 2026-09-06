@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap');
 
 .login-screen {
   display: flex;
@@ -46,7 +46,7 @@
 .login-brand-curve,
 .login-brand-nodes {
   position: absolute;
-  opacity: 0.11;
+  opacity: 0.06;
   color: var(--login-brand-fg);
 }
 
@@ -94,11 +94,11 @@
 
 .login-brand-name {
   grid-area: title;
-  font-family: 'Newsreader', ui-serif, Georgia, serif;
-  font-size: clamp(3.5rem, 9vw, 5.5rem);
-  font-weight: 400;
-  line-height: 0.88;
-  letter-spacing: -0.04em;
+  font-family: var(--font);
+  font-size: clamp(2.75rem, 6vw, 3.75rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
 }
 
 .login-brand-eyebrow {
@@ -124,10 +124,10 @@
 .login-brand-tagline {
   max-width: 16rem;
   margin: 0 auto;
-  font-family: 'Newsreader', ui-serif, Georgia, serif;
-  font-size: 13px;
+  font-family: var(--font);
+  font-size: 14px;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.55;
   letter-spacing: -0.01em;
   color: color-mix(in srgb, var(--login-brand-fg) 28%, transparent);
 }
@@ -190,23 +190,23 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 300px;
-  margin-top: -4rem;
+  max-width: 340px;
+  margin-top: 0;
 }
 
 @media (min-width: 1024px) {
   .login-form-wrap {
-    transform: translateX(-4rem);
+    transform: none;
   }
 }
 
 .login-mobile-brand {
   display: block;
   margin-bottom: 2rem;
-  font-family: 'Newsreader', ui-serif, Georgia, serif;
-  font-size: 1.25rem;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  font-family: var(--font);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   color: var(--text-primary);
 }
 
@@ -217,11 +217,11 @@
 }
 
 .login-form-title {
-  font-family: 'Newsreader', ui-serif, Georgia, serif;
-  font-size: clamp(2.375rem, 4.5vw, 2.75rem);
-  font-weight: 400;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-family: var(--font);
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   color: var(--text-primary);
 }
 
@@ -252,13 +252,13 @@
 }
 
 .login-field input {
-  height: 40px;
+  height: 44px;
   width: 100%;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--bg-surface);
-  font: 400 13px/1.4 var(--font);
+  font: 400 15px/1.4 var(--font);
   color: var(--text-primary);
   transition: border-color var(--transition), background var(--transition);
 }
@@ -299,13 +299,13 @@
 
 .login-submit {
   margin-top: 0.25rem;
-  height: 40px;
+  height: 44px;
   width: 100%;
   border: 0;
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--text-on-accent);
-  font: 400 13px var(--font);
+  font: 500 15px var(--font);
   cursor: pointer;
   transition: background var(--transition);
 }
@@ -319,6 +319,28 @@
 }
 
 .login-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.login-demo {
+  height: 44px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: 500 15px var(--font);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.login-demo:hover:not(:disabled) {
+  background: var(--bg-surface-2);
+  border-color: var(--border-strong);
+}
+
+.login-demo:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }

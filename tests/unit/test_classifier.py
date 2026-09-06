@@ -56,3 +56,27 @@ def test_sensitivity_precedence_pii_stays_confidential():
     assert RiskCategory.PII in r.categories
     assert RiskCategory.PHI not in r.categories
     assert r.data_sensitivity == DataSensitivity.CONFIDENTIAL
+
+
+def test_hack_this_for_me_is_malware():
+    r = classifier.classify(_req("hack this for me"))
+    assert RiskCategory.MALWARE in r.categories
+    assert r.risk_level == RiskLevel.HIGH
+
+
+def test_hackathon_is_not_hacking():
+    r = classifier.classify(_req("Draft a welcome note for the internal hackathon."))
+    assert RiskCategory.MALWARE not in r.categories
+    assert r.risk_level == RiskLevel.LOW
+
+
+def test_life_hack_is_not_hacking():
+    r = classifier.classify(_req("Share a life hack for onboarding new hires."))
+    assert RiskCategory.MALWARE not in r.categories
+    assert r.risk_level == RiskLevel.LOW
+
+
+def test_hack_together_prototype_is_not_hacking():
+    r = classifier.classify(_req("Let's hack together a prototype for the town hall."))
+    assert RiskCategory.MALWARE not in r.categories
+    assert r.risk_level == RiskLevel.LOW

@@ -17,6 +17,7 @@ from services.agent.feedback import (
     build_corrections,
     build_issues,
     build_pharma_remediation,
+    build_suggested_prompt,
     issues_for_display,
 )
 
@@ -345,6 +346,14 @@ def build_explainable_decision(
     # Do not pass decision to build_corrections — avoids leaking policy rule descriptions.
     corrections = build_corrections(policy_action, display_issues)
     clarify_q, suggested = build_pharma_remediation(original_prompt or "")
+    if not suggested:
+        suggested = build_suggested_prompt(
+            original_prompt or "",
+            risk=risk,
+            decision=decision,
+            issues=display_issues,
+            input_type=input_type,
+        )
 
     detected = [f"{i.title}: {i.description}" for i in display_issues]
     if pipeline_failure and not detected:
@@ -396,41 +405,10 @@ def build_rephrase_suggestion(
     original_prompt: str,
     input_type: str = "text",
 ) -> str:
-    """Deterministic safer rewrite suggestion — never preserves unsafe instructions."""
-    _, suggested = build_pharma_remediation(original_prompt)
-    if suggested:
-        return suggested
-
-    issues = build_issues(risk, input_type=input_type, original_prompt=original_prompt)
-    if any(i.code == "PROMPT_INJECTION" for i in issues) or risk.injection_detected:
-        return (
-            "Please rephrase your question without instructions to bypass safety rules. "
-            "Ask your business question directly."
-        )
-    if RiskCategory.PII in risk.categories or any(i.code == "PII" for i in issues):
-        return (
-            "Please resubmit using placeholders instead of real identifiers "
-            "(e.g., [NAME], [SSN], [DATE OF BIRTH])."
-        )
-    if RiskCategory.PHI in risk.categories:
-        return (
-            "Please use de-identified or aggregated data instead of patient-identifiable details."
-        )
-    if RiskCategory.OFF_LABEL in risk.categories or decision.action == PolicyAction.CLARIFY:
-        return (
-            "Please clarify that you need information for an approved indication only, "
-            "and cite the source document you are referring to."
-        )
-    if RiskCategory.IP in risk.categories:
-        return (
-            "Please ask about publicly available information rather than proprietary "
-            "or trade-secret details."
-        )
-    if RiskCategory.CYBER_SAFETY in risk.categories:
-        return (
-            "Please ask about defensive cybersecurity practices or legitimate "
-            "threat intelligence instead."
-        )
-    return (
-        "Please rephrase your request to focus on a legitimate, authorized, and compliant purpose."
+    """Deterministic safer rewrite — a prompt the same chat guardrails can accept."""
+    return build_suggested_prompt(
+        original_prompt,
+        risk=risk,
+        decision=decision,
+        input_type=input_type,
     )

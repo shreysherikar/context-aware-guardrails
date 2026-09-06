@@ -47,11 +47,8 @@ new UI is served without any backend change.
 |-----|-------|-------------|
 | Identity | — | Login via `POST /auth/dev-token` (dev-mode only) |
 | Text Evaluate | `POST /guardrail/evaluate` | Five example prompts, full result panel |
-| Image Evaluate | `POST /guardrail/evaluate-image` | File picker, preview, optical_assessment panel |
-| Audit Log | `GET /audit/events` | Filterable table, expandable row detail |
 
 ## Notes
 
 - Auth token is held in React state only — no localStorage / sessionStorage.
-- Every evaluate call generates an audit event visible in the Audit Log tab.
 - The Vite dev server must run alongside the backend; they are two separate processes.

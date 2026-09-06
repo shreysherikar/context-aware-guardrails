@@ -10,6 +10,8 @@ import './LoginPage.css';
 // Google Identity Services client ID (from apps/web-src/.env.production).
 // When unset, the Google button is hidden and only the email/password form shows.
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const DEMO_EMAIL = 'demo@contextguard.local';
+const DEMO_PASSWORD = 'demo';
 
 /**
  * Standalone login page (Concord-inspired split layout).
@@ -18,22 +20,21 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 export default function LoginPage() {
   const { auth, login } = useAuth();
   const { resolved, toggleTheme } = useTheme();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(DEMO_EMAIL);
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const googleButtonRef = useRef(null);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail || !password) return;
+  async function signInWith(nextEmail, nextPassword) {
+    const trimmedEmail = (nextEmail || '').trim();
+    if (!trimmedEmail || !nextPassword) return;
     setLoading(true);
     setError(null);
     try {
       const data = await apiFetch('/auth/login', {
         method: 'POST',
-        body: { email: trimmedEmail, password },
+        body: { email: trimmedEmail, password: nextPassword },
       });
       if (!data?.token) throw { status: 0, message: 'No token in response.', type: 'server' };
       login(data.token, data.role);
@@ -46,6 +47,17 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    await signInWith(email, password);
+  }
+
+  async function handleDemo() {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    await signInWith(DEMO_EMAIL, DEMO_PASSWORD);
   }
 
   useEffect(() => {
@@ -139,7 +151,7 @@ export default function LoginPage() {
         <div className="login-form-wrap">
           <p className="login-mobile-brand">ContextGuard</p>
 
-          <h1 className="login-form-title">Sign in</h1>
+          <h1 className="login-form-title">Welcome back</h1>
           <span className="login-form-rule" aria-hidden="true" />
 
           <form className="login-form" onSubmit={handleSubmit}>
@@ -177,7 +189,15 @@ export default function LoginPage() {
               disabled={loading || !email.trim() || !password}
               aria-busy={loading}
             >
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? 'Signing in…' : 'Continue'}
+            </button>
+            <button
+              type="button"
+              className="login-demo"
+              onClick={handleDemo}
+              disabled={loading}
+            >
+              Sign in as demo
             </button>
           </form>
 
@@ -195,8 +215,8 @@ export default function LoginPage() {
           )}
 
           <p className="login-footnote">
-            Local accounts use <code>clinician@contextguard.local</code> / <code>clinician</code>
-            (same pattern for admin, marketing, employee). Token stays in page memory only.
+            Dummy account: <code>{DEMO_EMAIL}</code> / <code>{DEMO_PASSWORD}</code>
+            (clinician). Token stays in page memory only.
           </p>
         </div>
       </main>

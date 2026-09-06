@@ -17,16 +17,22 @@ from services.auth.google_auth import (
 )
 from services.auth.password import (
     DEFAULT_DESKTOP_USERS,
+    DUMMY_EMAIL,
+    DUMMY_PASSWORD,
     PasswordIdentity,
     authenticate_password,
+    dummy_login_enabled,
 )
 
 __all__ = [
     "AuthConfigError",
     "AuthError",
     "DEFAULT_DESKTOP_USERS",
+    "DUMMY_EMAIL",
+    "DUMMY_PASSWORD",
     "PasswordIdentity",
     "authenticate_password",
+    "dummy_login_enabled",
     "GoogleAuthError",
     "GoogleIdTokenVerifier",
     "GoogleIdentity",

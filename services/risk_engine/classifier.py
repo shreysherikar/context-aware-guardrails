@@ -16,6 +16,8 @@ import re
 from domain.enums import DataSensitivity, RiskCategory, RiskLevel
 from domain.models import GuardrailRequest, RiskAssessment
 from services.cyber_safety.darkweb import assess_darkweb_content
+from services.risk_engine.offensive_ml import predict_offensive_category
+from services.risk_engine.offensive_patterns import offensive_categories
 from services.risk_engine.pharma_patterns import has_safe_pharma_signals, match_pharma_patterns
 
 # Sensitivity precedence: a more sensitive classification must never be
@@ -37,6 +39,9 @@ _CATEGORY_SENSITIVITY = {
     RiskCategory.IP: DataSensitivity.INTERNAL,
     RiskCategory.PROMPT_INJECTION: DataSensitivity.INTERNAL,
     RiskCategory.CYBER_SAFETY: DataSensitivity.INTERNAL,
+    RiskCategory.MALWARE: DataSensitivity.INTERNAL,
+    RiskCategory.PHISHING: DataSensitivity.CONFIDENTIAL,
+    RiskCategory.DATA_EXFILTRATION: DataSensitivity.CONFIDENTIAL,
 }
 
 
@@ -104,7 +109,17 @@ class KeywordMockClassifier(RiskClassifier):
             categories.append(RiskCategory.OFF_LABEL)
         if any(re.search(p, text) for p in self.IP_PATTERNS):
             categories.append(RiskCategory.IP)
-        if injection:
+        for category in offensive_categories(request.prompt):
+            if category not in categories:
+                categories.append(category)
+            if category == RiskCategory.PROMPT_INJECTION:
+                injection = True
+        ml_category = predict_offensive_category(request.prompt)
+        if ml_category is not None and ml_category not in categories:
+            categories.append(ml_category)
+            if ml_category == RiskCategory.PROMPT_INJECTION:
+                injection = True
+        if injection and RiskCategory.PROMPT_INJECTION not in categories:
             categories.append(RiskCategory.PROMPT_INJECTION)
 
         # Pharma-domain ambiguous / disguised-risk patterns (dataset + project brief).
@@ -136,7 +151,14 @@ class KeywordMockClassifier(RiskClassifier):
             level = RiskLevel.CRITICAL
         elif darkweb_level == RiskLevel.CRITICAL:
             level = RiskLevel.CRITICAL
-        elif darkweb_level == RiskLevel.HIGH:
+        elif darkweb_level == RiskLevel.HIGH or any(
+            c in categories
+            for c in (
+                RiskCategory.MALWARE,
+                RiskCategory.PHISHING,
+                RiskCategory.DATA_EXFILTRATION,
+            )
+        ):
             level = RiskLevel.HIGH
         elif RiskCategory.PHI in categories:
             level = RiskLevel.HIGH

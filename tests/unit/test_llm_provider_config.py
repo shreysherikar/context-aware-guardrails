@@ -24,11 +24,25 @@ def _use_groq_key(monkeypatch):
 
 def test_generation_provider_unset_means_no_gateway(monkeypatch):
     monkeypatch.delenv("LLM_GENERATION_PROVIDER", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "")
     assert get_gateway() is None
 
 
 def test_generation_provider_empty_is_treated_as_unset(monkeypatch):
     monkeypatch.setenv("LLM_GENERATION_PROVIDER", "")
+    monkeypatch.setenv("GROQ_API_KEY", "")
+    assert get_gateway() is None
+
+
+def test_groq_key_alone_enables_generation(monkeypatch):
+    monkeypatch.delenv("LLM_GENERATION_PROVIDER", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    assert isinstance(get_gateway(), GroqLLMGateway)
+
+
+def test_groq_provider_without_key_does_not_crash(monkeypatch):
+    monkeypatch.setenv("LLM_GENERATION_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "")
     assert get_gateway() is None
 
 
@@ -40,7 +54,14 @@ def test_generation_provider_groq_builds_groq_gateway(monkeypatch):
 
 def test_generation_provider_ollama_builds_ollama_gateway(monkeypatch):
     monkeypatch.setenv("LLM_GENERATION_PROVIDER", "ollama")
+    monkeypatch.setenv("GROQ_API_KEY", "")
     assert isinstance(get_gateway(), OllamaLLMGateway)
+
+
+def test_groq_key_is_used_on_cloud_instead_of_ollama(monkeypatch):
+    monkeypatch.setenv("LLM_GENERATION_PROVIDER", "ollama")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    assert isinstance(get_gateway(), GroqLLMGateway)
 
 
 def test_generation_provider_unknown_fails_loudly(monkeypatch):
@@ -64,8 +85,12 @@ def test_classifer_and_generation_providers_are_independent(monkeypatch):
     assert isinstance(get_classifier(), KeywordMockClassifier)
     assert isinstance(get_gateway(), GroqLLMGateway)
 
-    # Real classifier + no generation gateway.
+    # Real classifier + no generation gateway (no Groq key, provider unset).
     monkeypatch.setenv("LLM_PROVIDER", "groq")
     monkeypatch.delenv("LLM_GENERATION_PROVIDER", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
     assert isinstance(get_classifier(), GroqRiskClassifier)
+    assert isinstance(get_gateway(), GroqLLMGateway)
+
+    monkeypatch.setenv("GROQ_API_KEY", "")
     assert get_gateway() is None

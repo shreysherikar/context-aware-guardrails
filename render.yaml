@@ -13,19 +13,24 @@
 #   AUTH_DEV_MODE=true
 #   AUTH_JWT_SECRET=<openssl rand -hex 32>      (REQUIRED; empty => startup fails)
 #   LLM_PROVIDER=mock
-#   LLM_GENERATION_PROVIDER=groq               (OPTIONAL — see comment below)
-#   GROQ_API_KEY=<key>                          (OPTIONAL — set WITH provider)
+#   GROQ_API_KEY=<dashboard secret>            (OPTIONAL — enables Groq answers
+#                                               for all users; do not commit)
 #   GROQ_MODEL=openai/gpt-oss-20b
+#   LLM_GENERATION_PROVIDER=<unset>            (optional; Groq auto-enables when
+#                                               GROQ_API_KEY is set)
 #   ALLOWED_ORIGINS=<unset>          (same-origin deployment: leave unset — the
 #                                     dashboard talks to S3/CloudFront; if the
 #                                     API needs browser access list the origins)
 #   SERVE_STATIC_FRONTEND=true       (same-origin hosting: this service serves
 #                                     the built apps/web dashboard at /)
 #
-# IMPORTANT: LLM_GENERATION_PROVIDER=groq WITHOUT a GROQ_API_KEY crashes the app
-# at startup — the Groq client validates the key when the gateway is constructed
-# at import. Either set BOTH to groq+real key, or leave the provider unset and
-# keep the fully-offline mock demo.
+# IMPORTANT: Do not put GROQ_API_KEY in this file or in git. Cloud answers use
+# the dashboard secret: set GROQ_API_KEY there (Render → Environment). When that
+# secret is present, generation uses Groq automatically. LLM_GENERATION_PROVIDER
+# can stay unset. Local desktop keeps Ollama via LLM_GENERATION_PROVIDER=ollama.
+#
+# Do not set LLM_GENERATION_PROVIDER=groq in the repo without a dashboard key —
+# the app now skips Groq instead of crashing if the key is missing.
 
 services:
   - type: web
@@ -48,8 +53,9 @@ services:
       # Risk classifier: mock = offline, deterministic, no network/credentials.
       - key: LLM_PROVIDER
         value: mock
-      # Optional live generation — set in dashboard to "groq" only together with
-      # a real GROQ_API_KEY. Leave empty for the offline demo.
+      # Optional live generation — set GROQ_API_KEY in the dashboard (never in
+      # git). When the key is present, Groq answers ALLOW-ed prompts even if
+      # LLM_GENERATION_PROVIDER is left empty.
       - key: LLM_GENERATION_PROVIDER
         sync: false
       - key: GROQ_API_KEY

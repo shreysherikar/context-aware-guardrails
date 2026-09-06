@@ -183,6 +183,17 @@ def test_password_login_works_and_produces_accepted_token(monkeypatch):
     assert verify_token(token) == "clinician"
 
 
+def test_dummy_login_works_when_dev_mode_on(monkeypatch):
+    monkeypatch.setenv("AUTH_DEV_MODE", "true")
+    monkeypatch.setenv("AUTH_PASSWORD_USERS", "")
+    resp = client.post(
+        "/auth/login",
+        json={"email": "demo@contextguard.local", "password": "demo"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["role"] == "clinician"
+
+
 # ---------------------------------------------------------------------------
 # Google ID-token sign-in gated by the permanent allowlist
 # ---------------------------------------------------------------------------

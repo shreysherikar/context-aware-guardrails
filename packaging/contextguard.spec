@@ -27,6 +27,8 @@ datas = [
     (str(ROOT / "apps" / "web"), "apps/web"),
     (str(ROOT / "policies"), "policies"),
     (str(ROOT / "evidence"), "evidence"),
+    (str(ROOT / "data" / "offensive_ml_model.json"), "data"),
+    (str(ROOT / "data" / "offensive_cyber_prompts.csv"), "data"),
 ]
 
 a = Analysis(

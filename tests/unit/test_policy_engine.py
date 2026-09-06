@@ -53,6 +53,36 @@ def test_block_on_injection_alone():
     assert decision.policy_id == "INJECTION-002"
 
 
+def test_block_unauthorized_hacking():
+    risk = RiskAssessment(
+        risk_level=RiskLevel.HIGH,
+        categories=[RiskCategory.MALWARE],
+    )
+    decision = engine.evaluate(risk, "researcher")
+    assert decision.action == PolicyAction.BLOCK
+    assert decision.policy_id == "HACK-001"
+
+
+def test_block_data_exfiltration_text():
+    risk = RiskAssessment(
+        risk_level=RiskLevel.HIGH,
+        categories=[RiskCategory.DATA_EXFILTRATION],
+    )
+    decision = engine.evaluate(risk, "researcher")
+    assert decision.action == PolicyAction.BLOCK
+    assert decision.policy_id == "EXFIL-001"
+
+
+def test_block_phishing_text():
+    risk = RiskAssessment(
+        risk_level=RiskLevel.HIGH,
+        categories=[RiskCategory.PHISHING],
+    )
+    decision = engine.evaluate(risk, "researcher")
+    assert decision.action == PolicyAction.BLOCK
+    assert decision.policy_id == "PHISH-001"
+
+
 def test_block_on_disguise_alone():
     risk = RiskAssessment(
         risk_level=RiskLevel.CRITICAL,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from domain.enums import PolicyAction
@@ -23,6 +24,7 @@ from services.agent.feedback import (
     build_issues,
     build_pharma_remediation,
     build_prompt_highlights,
+    build_suggested_prompt,
     compose_deterministic_message,
     guardrail_was_triggered,
     issues_for_display,
@@ -521,6 +523,14 @@ class GuardrailAgent:
 
         corrections = build_corrections(action, display_issues, decision=decision)
         clarify_q, suggested = build_pharma_remediation(original_prompt or "")
+        if not suggested:
+            suggested = build_suggested_prompt(
+                original_prompt or "",
+                risk=risk,
+                decision=decision,
+                issues=display_issues,
+                input_type=input_type,
+            )
         message = await compose_agent_message(
             action=action,
             issues=display_issues,
@@ -545,18 +555,25 @@ class GuardrailAgent:
                 suggested_rewrite=suggested,
             )
         if action == PolicyAction.ALLOW and not answer and not output_flagged:
+            provider = os.getenv("LLM_GENERATION_PROVIDER", "").strip().lower()
             if no_gateway:
                 message = (
-                    "No AI model is configured. Set LLM_GENERATION_PROVIDER=ollama in your "
-                    ".env file and restart the server."
+                    "No AI model is configured. Set LLM_GENERATION_PROVIDER=groq or ollama "
+                    "in your .env file and restart the server."
                 )
             elif llm_failed:
-                message = (
-                    "I couldn't reach the local AI model. Open a terminal and run:\n"
-                    "  ollama serve\n"
-                    "  ollama pull llama3.2:3b\n"
-                    "Then try again."
-                )
+                if provider == "groq":
+                    message = (
+                        "I couldn't reach Groq. Add a valid GROQ_API_KEY to your .env file "
+                        "and restart the server."
+                    )
+                else:
+                    message = (
+                        "I couldn't reach the local AI model. Open a terminal and run:\n"
+                        "  ollama serve\n"
+                        "  ollama pull llama3.2:3b\n"
+                        "Then try again."
+                    )
         return AgentChatResponse(
             conversation_id=conversation_id,
             action=action,

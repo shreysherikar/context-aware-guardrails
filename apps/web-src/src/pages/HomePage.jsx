@@ -7,8 +7,8 @@ import GuardrailNotice from '../components/GuardrailNotice';
 import HighlightedPrompt from '../components/HighlightedPrompt';
 import brandLogo from '../assets/brand-logo.png';
 import {
-  Shield, Paperclip, Zap, Wand2, FileText,
-  ChevronDown, Send, Clock, SquarePen, Sun, Moon, Loader2, X,
+  Plus, Zap, Wand2, FileText,
+  ChevronDown, ArrowUp, Clock, SquarePen, Sun, Moon, Loader2, X, Sparkles,
 } from 'lucide-react';
 import {
   CHAT_ATTACHMENT_HINT,
@@ -52,7 +52,6 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
   const [attachedFile, setAttachedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
-  const [attachNotice, setAttachNotice] = useState(null);
   const [voiceHint, setVoiceHint] = useState(null);
   const threadEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -84,7 +83,6 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
 
   function attachFile(file) {
     setError(null);
-    setAttachNotice(null);
     if (!file) return;
 
     const validationError = validateChatAttachment(file);
@@ -107,7 +105,6 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
 
     setAttachedFile(uploadFile);
     setFilePreview(canPreviewAttachment(uploadFile) ? URL.createObjectURL(uploadFile) : null);
-    setAttachNotice(`ContextGuard sees your ${attachmentLabel(uploadFile).toLowerCase()}: ${uploadFile.name}`);
   }
 
   function handleDragOver(e) {
@@ -190,6 +187,8 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
         action: data.action,
         issues: data.issues || [],
         highlights: data.highlights || [],
+        corrections: data.corrections || [],
+        suggestedRewrite: data.suggested_rewrite || data.sanitized_text || null,
         blocked: data.blocked,
       });
     } catch (err) {
@@ -243,8 +242,8 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
           <div className="home-brand-mark">
             <img src={brandLogo} alt="Novo Nordisk" className="home-brand-logo" />
           </div>
-          <h1 className="home-greeting">Hey! I&apos;m ContextGuard</h1>
-          <p className="home-subtitle">Chat normally — I&apos;ll only flag policy issues when something needs attention</p>
+          <h1 className="home-greeting">What can I help with?</h1>
+          <p className="home-subtitle">Ask anything. Policy checks run quietly in the background.</p>
 
           <div className="home-quick-actions">
             {QUICK_ACTIONS.map(({ id, label, Icon, prompt: sample }) => (
@@ -295,14 +294,24 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
                 )}
 
                 {msg.loading ? (
-                  <div className="home-chat-bubble home-chat-bubble--assistant home-chat-loading">
-                    <Loader2 size={16} className="home-spinner" />
-                    <span>Thinking…</span>
+                  <div className="home-chat-row home-chat-row--assistant">
+                    <span className="home-chat-avatar" aria-hidden="true">
+                      <Sparkles size={14} strokeWidth={1.8} />
+                    </span>
+                    <div className="home-chat-bubble home-chat-bubble--assistant home-chat-loading">
+                      <Loader2 size={16} className="home-spinner" />
+                      <span>Thinking…</span>
+                    </div>
                   </div>
                 ) : (
                   msg.assistantText && (
-                    <div className={`home-chat-bubble home-chat-bubble--assistant${msg.blocked ? ' is-blocked' : ''}`}>
-                      <p>{msg.assistantText}</p>
+                    <div className="home-chat-row home-chat-row--assistant">
+                      <span className="home-chat-avatar" aria-hidden="true">
+                        <Sparkles size={14} strokeWidth={1.8} />
+                      </span>
+                      <div className={`home-chat-bubble home-chat-bubble--assistant${msg.blocked ? ' is-blocked' : ''}`}>
+                        <p>{msg.assistantText}</p>
+                      </div>
                     </div>
                   )
                 )}
@@ -315,9 +324,6 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
 
       <div className="home-composer-dock">
         {error && <p className="home-chat-error">{error}</p>}
-        {attachNotice && !error && (
-          <p className="home-chat-attach-notice">{attachNotice}</p>
-        )}
         {voiceHint && !error && (
           <p className="home-chat-voice-hint" role="status">{voiceHint}</p>
         )}
@@ -329,29 +335,29 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
           onDrop={handleDrop}
         >
           {attachedFile && (
-            <div className="home-composer-attachment">
-              {showImagePreview ? (
-                <img src={filePreview} alt="" className="home-composer-attachment-img" />
-              ) : (
-                <div className="home-composer-attachment-icon" aria-hidden="true">
-                  <FileText size={22} />
-                </div>
-              )}
-              <div className="home-composer-attachment-meta">
-                <span className="home-composer-attachment-name">{attachedFile.name}</span>
-                <span className="home-composer-attachment-hint home-composer-attachment-ready">
-                  Ready to send · {attachmentLabel(attachedFile)} · max 10 MB
+            <div className="home-composer-chips">
+              <div className="home-composer-chip">
+                {showImagePreview ? (
+                  <img src={filePreview} alt="" className="home-composer-chip-thumb" />
+                ) : (
+                  <div className="home-composer-chip-icon" aria-hidden="true">
+                    <FileText size={16} />
+                  </div>
+                )}
+                <span className="home-composer-chip-meta">
+                  <span className="home-composer-chip-name">{attachedFile.name}</span>
+                  <span className="home-composer-chip-kind">{attachmentLabel(attachedFile)}</span>
                 </span>
+                <button
+                  type="button"
+                  className="home-composer-chip-remove"
+                  onClick={() => clearAttachment()}
+                  aria-label="Remove attachment"
+                  disabled={loading}
+                >
+                  <X size={12} />
+                </button>
               </div>
-              <button
-                type="button"
-                className="home-composer-attachment-remove"
-                onClick={() => clearAttachment()}
-                aria-label="Remove attachment"
-                disabled={loading}
-              >
-                <X size={14} />
-              </button>
             </div>
           )}
 
@@ -360,8 +366,8 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={attachedFile ? 'Add a note (optional)…' : 'Message ContextGuard…'}
-            rows={hasThread ? 1 : 3}
+            placeholder="Ask anything"
+            rows={1}
             autoFocus
             disabled={loading}
           />
@@ -372,10 +378,10 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
                 inputRef={fileInputRef}
                 disabled={loading}
                 ariaLabel={`Attach file (${CHAT_ATTACHMENT_HINT})`}
-                wrapClassName="home-composer-icon home-composer-file-trigger"
+                wrapClassName="home-composer-icon home-composer-plus home-composer-file-trigger"
                 onFile={attachFile}
               >
-                <Paperclip size={16} aria-hidden="true" />
+                <Plus size={18} aria-hidden="true" />
                 <span className="sr-only">Attach file</span>
               </FilePickInput>
               <VoiceInputButton
@@ -390,7 +396,7 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
 
             <div className="home-composer-right">
               <button type="button" className="home-model-select" tabIndex={-1}>
-                <Shield size={14} />
+                <Sparkles size={14} />
                 <span>{auth?.role || 'User'}</span>
                 <ChevronDown size={14} />
               </button>
@@ -401,11 +407,12 @@ export default function HomePage({ onNewSession, onOpenHistory }) {
                 aria-label="Send message"
                 onClick={() => submit()}
               >
-                {loading ? <Loader2 size={16} className="home-spinner" /> : <Send size={16} />}
+                {loading ? <Loader2 size={16} className="home-spinner" /> : <ArrowUp size={18} strokeWidth={2.4} />}
               </button>
             </div>
           </div>
         </div>
+        <p className="home-composer-legal">ContextGuard can make mistakes. Check important info.</p>
       </div>
     </div>
   );

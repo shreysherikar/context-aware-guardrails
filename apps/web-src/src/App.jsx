@@ -3,8 +3,8 @@ import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { useChatHistory } from './context/ChatHistoryContext';
 import {
-  Home, FileText, Image, ClipboardList, LogOut, Shield, Sparkles, Network, Sun, Moon,
-  PanelLeftClose, MessageSquare, Monitor, BookCheck,
+  Home, FileText, LogOut, Shield, Sparkles, Network, Sun, Moon,
+  PanelLeftClose, MessageSquare, PenLine, SquarePen,
 } from 'lucide-react';
 import HealthDot from './components/HealthDot';
 import LoginPage from './pages/LoginPage';
@@ -12,9 +12,6 @@ import HomePage from './pages/HomePage';
 import AgentFlowPage from './pages/AgentFlowPage';
 import GovernanceDashboard from './pages/GovernanceDashboard';
 import TextEvaluatePage from './pages/TextEvaluatePage';
-import ImageEvaluatePage from './pages/ImageEvaluatePage';
-import AuditLogPage from './pages/AuditLogPage';
-import ComputerUsePage from './pages/ComputerUsePage';
 import GxpReviewPage from './pages/GxpReviewPage';
 import sidebarLogo from './assets/sidebar-logo.png';
 
@@ -22,11 +19,8 @@ const EXPERIENCE = 'experience';
 
 const TOOLS_NAV = [
   { id: 'governance', label: 'Governance', Icon: Shield },
-  { id: 'computer', label: 'Computer Use', Icon: Monitor },
-  { id: 'gxp', label: 'GxP Rewrite', Icon: BookCheck },
+  { id: 'gxp', label: 'Prompt Rewrite', Icon: PenLine },
   { id: 'text', label: 'Prompt Lab', Icon: FileText },
-  { id: 'image', label: 'Image Evaluate', Icon: Image },
-  { id: 'audit', label: 'Audit Log', Icon: ClipboardList },
 ];
 
 const TOOL_LABELS = Object.fromEntries(TOOLS_NAV.map((t) => [t.id, t.label]));
@@ -60,7 +54,6 @@ export default function App() {
   const isChat = isExperience && experienceMode === 'chat';
   const isFullBleed = isExperience;
   const isGovernance = tab === 'governance';
-  const isComputerUse = tab === 'computer';
   const isGxpReview = tab === 'gxp';
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
@@ -169,7 +162,6 @@ export default function App() {
             </span>
             <span className="sidebar-brand-copy">
               <span className="sidebar-brand-name">ContextGuard</span>
-              <span className="sidebar-brand-tag">Policy layer</span>
             </span>
           </button>
           <button
@@ -190,10 +182,10 @@ export default function App() {
               type="button"
               className={`sidebar-rail-btn${isChat && isExperience ? ' active' : ''}`}
               onClick={openChat}
-              title="Chat"
-              aria-label="Chat"
+              title="New chat"
+              aria-label="New chat"
             >
-              <Sparkles size={18} strokeWidth={1.75} />
+              <SquarePen size={18} strokeWidth={1.75} />
             </button>
             <button
               type="button"
@@ -221,6 +213,14 @@ export default function App() {
         )}
 
         <div id="app-menu-panel" className="sidebar-panel">
+          <button
+            type="button"
+            className="sidebar-new-chat"
+            onClick={openChat}
+          >
+            <SquarePen size={16} strokeWidth={1.75} />
+            New chat
+          </button>
           <div className="sidebar-section">
             <p className="sidebar-section-label">Experience</p>
             <div className="sidebar-mode-switch" role="group" aria-label="Chat or pipeline">
@@ -341,7 +341,7 @@ export default function App() {
       </aside>
 
       <div className={workspaceClass}>
-        {!isFullBleed && !isGovernance && !isComputerUse && !isGxpReview && (
+        {!isFullBleed && !isGovernance && !isGxpReview && (
           <header className="topbar">
             <div className="topbar-left">
               <p className="eyebrow">Guardrail console</p>
@@ -368,11 +368,8 @@ export default function App() {
           )}
           {isExperience && isPipeline && <AgentFlowPage />}
           {tab === 'governance' && <GovernanceDashboard />}
-          {tab === 'computer' && <ComputerUsePage />}
           {tab === 'gxp' && <GxpReviewPage />}
           {tab === 'text' && <TextEvaluatePage />}
-          {tab === 'image' && <ImageEvaluatePage />}
-          {tab === 'audit' && <AuditLogPage />}
         </main>
       </div>
     </div>

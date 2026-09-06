@@ -37,6 +37,8 @@ os.environ.setdefault("OUTPUT_GUARDRAIL_PROVIDER", "")
 os.environ.setdefault("CLAIM_VERIFICATION_PROVIDER", "")
 os.environ.setdefault("OPTICAL_OCR_PROVIDER", "mock")
 os.environ.setdefault("AGENT_LLM_FEEDBACK", "false")
+# Never construct a real Groq client from a developer's exported key.
+os.environ["GROQ_API_KEY"] = ""
 
 # Storage isolation: the persistence modules (services/audit, services/governance,
 # services/guardrail_review) switch to PostgreSQL whenever DATABASE_URL is set, and

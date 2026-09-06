@@ -32,8 +32,26 @@ def test_unknown_email_is_rejected():
 
 def test_empty_password_users_rejects_everyone(monkeypatch):
     monkeypatch.setenv("AUTH_PASSWORD_USERS", "")
+    monkeypatch.setenv("AUTH_DEV_MODE", "false")
+    monkeypatch.delenv("AUTH_DUMMY_LOGIN", raising=False)
     with pytest.raises(AuthError):
         authenticate_password("clinician@acme.com", "secret")
+
+
+def test_dummy_account_works_in_dev_mode(monkeypatch):
+    monkeypatch.setenv("AUTH_PASSWORD_USERS", "")
+    monkeypatch.setenv("AUTH_DEV_MODE", "true")
+    identity = authenticate_password("demo@contextguard.local", "demo")
+    assert identity.email == "demo@contextguard.local"
+    assert identity.role == "clinician"
+
+
+def test_dummy_account_works_when_flag_set(monkeypatch):
+    monkeypatch.setenv("AUTH_PASSWORD_USERS", "")
+    monkeypatch.setenv("AUTH_DEV_MODE", "false")
+    monkeypatch.setenv("AUTH_DUMMY_LOGIN", "true")
+    identity = authenticate_password("DEMO@contextguard.local", "demo")
+    assert identity.role == "clinician"
 
 
 def test_desktop_defaults_parse(monkeypatch):

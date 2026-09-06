@@ -81,7 +81,7 @@ from services.governance.runtime import get_runtime  # noqa: E402
 from services.guardrail_review.models import EvaluationSnapshot  # noqa: E402
 from services.guardrail_review.store import get_review_store  # noqa: E402
 from services.llm import LLMRequest  # noqa: E402
-from services.llm.factory import get_gateway  # noqa: E402
+from services.llm.factory import get_gateway, resolved_generation_provider  # noqa: E402
 from services.nemo_guardrail.factory import get_nemo_dialog_rail, get_nemo_input_rail  # noqa: E402
 from services.optical_guardrail.analyzer import OpticalAnalyzer  # noqa: E402
 from services.optical_guardrail.factory import get_ocr_provider  # noqa: E402
@@ -606,7 +606,7 @@ def demo_config():
     """Expose active provider wiring for the interactive demo."""
     return {
         "llm_provider": os.getenv("LLM_PROVIDER", "mock"),
-        "generation_provider": os.getenv("LLM_GENERATION_PROVIDER", ""),
+        "generation_provider": resolved_generation_provider(),
         "ocr_provider": os.getenv("OPTICAL_OCR_PROVIDER", "mock"),
         "ollama_model": os.getenv("OLLAMA_MODEL", "qwen3.6:latest"),
         "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),

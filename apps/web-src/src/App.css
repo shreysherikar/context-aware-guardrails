@@ -1,6 +1,6 @@
 /* ContextGuard UI — polished SaaS shell built on tokens.css */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root {
@@ -10,7 +10,7 @@ html, body, #root {
 body {
   background: var(--bg-page);
   color: var(--text-primary);
-  font: 400 13.5px/1.5 var(--font);
+  font: 400 15px/1.5 var(--font);
   -webkit-font-smoothing: antialiased;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
@@ -67,8 +67,8 @@ a:hover { text-decoration: underline; }
   min-width: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-surface);
-  border-right: 1px solid var(--border);
+  background: var(--rail-bg);
+  border-right: 1px solid var(--rail-border);
   z-index: 101;
   padding: 0;
   position: static;
@@ -80,7 +80,7 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 8px;
   padding: 12px 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0;
 }
 
 .sidebar--expandable.is-expanded .sidebar-brand-row {
@@ -271,7 +271,7 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 4px;
   padding: 8px 0 12px;
-  border-top: 1px solid var(--border);
+  border-top: 0;
 }
 
 /* Expanded panel */
@@ -299,13 +299,13 @@ a:hover { text-decoration: underline; }
 }
 
 .sidebar-section-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-muted);
-  margin-bottom: 8px;
-  padding: 0 8px;
+  margin-bottom: 6px;
+  padding: 0 10px;
 }
 
 .sidebar-mode-switch {
@@ -350,6 +350,27 @@ a:hover { text-decoration: underline; }
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+}
+
+.sidebar-new-chat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font: 500 14px var(--font);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.sidebar-new-chat:hover {
+  background: var(--rail-hover);
 }
 
 .sidebar-tools {
@@ -476,7 +497,7 @@ a:hover { text-decoration: underline; }
   gap: 2px;
   margin-top: auto;
   padding-top: 10px;
-  border-top: 1px solid var(--border);
+  border-top: 0;
 }
 
 .sidebar-health-row {
@@ -496,8 +517,8 @@ a:hover { text-decoration: underline; }
   margin-top: 6px;
   padding: 8px;
   border-radius: 12px;
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 0;
 }
 
 .sidebar-user-avatar {
