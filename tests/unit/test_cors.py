@@ -19,6 +19,7 @@ def test_configure_desktop_environment_allows_mobile_origins(monkeypatch, tmp_pa
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     monkeypatch.delenv("OLLAMA_TIMEOUT", raising=False)
+    monkeypatch.delenv("AUTH_PASSWORD_USERS", raising=False)
 
     configure_desktop_environment()
 
@@ -26,6 +27,7 @@ def test_configure_desktop_environment_allows_mobile_origins(monkeypatch, tmp_pa
     assert "https://localhost" in origins
     assert "capacitor://localhost" in origins
     assert os.environ["SERVE_STATIC_FRONTEND"] == "true"
+    assert "clinician@contextguard.local" in os.environ["AUTH_PASSWORD_USERS"]
 
 
 def test_desktop_api_serves_ui_and_allows_capacitor_origin(tmp_path):
@@ -58,7 +60,7 @@ assert "/assets/" in html.text
 
 for origin in ("https://localhost", "capacitor://localhost", "http://localhost"):
     preflight = client.options(
-        "/auth/dev-token",
+        "/auth/login",
         headers={
             "Origin": origin,
             "Access-Control-Request-Method": "POST",
@@ -69,8 +71,8 @@ for origin in ("https://localhost", "capacitor://localhost", "http://localhost")
     assert preflight.headers.get("access-control-allow-origin") == origin, origin
 
 login = client.post(
-    "/auth/dev-token",
-    json={"role": "clinician"},
+    "/auth/login",
+    json={"email": "clinician@contextguard.local", "password": "clinician"},
     headers={"Origin": "https://localhost"},
 )
 assert login.status_code == 200, login.text

@@ -47,3 +47,7 @@ def test_serve_static_frontend_is_forced_true_in_test_process():
     # The static-mount gate defaults to off in real deployments; conftest must
     # override that so the existing web_ui static-mount coverage stays active.
     assert os.environ.get("SERVE_STATIC_FRONTEND", "").strip().lower() == "true"
+
+
+def test_password_users_are_forced_empty_in_test_process():
+    assert os.environ.get("AUTH_PASSWORD_USERS", "").strip() == ""

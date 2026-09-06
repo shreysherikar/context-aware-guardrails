@@ -71,6 +71,7 @@ os.environ["GOOGLE_CLIENT_ID"] = ""
 os.environ["GOOGLE_ALLOWED_EMAILS"] = ""
 os.environ["GOOGLE_ALLOWED_DOMAINS"] = ""
 os.environ["GOOGLE_DEFAULT_ROLE"] = ""
+os.environ["AUTH_PASSWORD_USERS"] = ""
 
 import pytest  # noqa: E402
 

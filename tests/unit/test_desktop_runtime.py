@@ -38,6 +38,7 @@ def test_configure_desktop_environment_sets_writable_paths(monkeypatch, tmp_path
     monkeypatch.delenv("OLLAMA_TIMEOUT", raising=False)
     monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
     monkeypatch.setenv("SERVE_STATIC_FRONTEND", "false")
+    monkeypatch.delenv("AUTH_PASSWORD_USERS", raising=False)
 
     data_dir = configure_desktop_environment()
 
@@ -55,6 +56,7 @@ def test_configure_desktop_environment_sets_writable_paths(monkeypatch, tmp_path
     assert os.environ["OLLAMA_MODEL"] == "llama3.2:3b"
     assert os.environ["OLLAMA_BASE_URL"] == "http://127.0.0.1:11434"
     assert os.environ["SERVE_STATIC_FRONTEND"] == "true"
+    assert "clinician@contextguard.local" in os.environ["AUTH_PASSWORD_USERS"]
     assert "capacitor://localhost" in os.environ["ALLOWED_ORIGINS"]
 
 
@@ -63,6 +65,8 @@ def test_configure_desktop_environment_keeps_existing_origins(monkeypatch, tmp_p
     monkeypatch.setenv("ALLOWED_ORIGINS", "https://d123abc.cloudfront.net")
     monkeypatch.setenv("AUTH_DEV_MODE", "false")
     monkeypatch.delenv("AUTH_JWT_SECRET", raising=False)
+    monkeypatch.delenv("AUTH_PASSWORD_USERS", raising=False)
+    monkeypatch.delenv("LLM_GENERATION_PROVIDER", raising=False)
 
     configure_desktop_environment()
 

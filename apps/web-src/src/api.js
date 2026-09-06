@@ -2,7 +2,7 @@
  * Centralized API client.
  *
  * Attaches Authorization: Bearer <token> when present, centralizes base URL
- * (localStorage override, then VITE_API_BASE_URL, otherwise same-origin;
+ * (VITE_API_BASE_URL when this UI is hosted separately, otherwise same-origin;
  * proxied in dev via vite.config), and normalizes error handling into a
  * consistent shape components can render.
  */
@@ -17,9 +17,12 @@
 
 const STORAGE_KEY = 'contextguard-api-base';
 
-export function isNativeApp() {
+function servedFromLocalApi() {
   if (typeof window === 'undefined') return false;
-  return Boolean(window.Capacitor?.isNativePlatform?.());
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+  if (window.location.protocol === 'capacitor:') return true;
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host);
 }
 
 export function getApiBase() {
@@ -42,10 +45,11 @@ export function setApiBase(base) {
 
 export function apiUrl(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
-  const stored = getApiBase();
+  // Desktop window and phone URL are same-origin with the API — do not send
+  // those calls to the production VITE_API_BASE_URL.
+  if (servedFromLocalApi()) return normalized;
   const envBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
-  const base = stored || envBase;
-  return base ? `${base}${normalized}` : normalized;
+  return envBase ? `${envBase}${normalized}` : normalized;
 }
 
 /**

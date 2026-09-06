@@ -413,6 +413,11 @@ class DevTokenRequest(BaseModel):
     role: str
 
 
+class PasswordLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
 @app.post("/auth/dev-token")
 def issue_dev_token(body: DevTokenRequest) -> dict[str, str]:
     """Dev-only: mint a signed token for manual/local testing."""
@@ -422,6 +427,23 @@ def issue_dev_token(body: DevTokenRequest) -> dict[str, str]:
         return {"token": auth.mint_dev_token(body.role)}
     except auth.AuthConfigError as exc:
         logger.error("Dev-token issuance misconfigured: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/auth/login")
+def login_with_password(body: PasswordLoginRequest) -> dict[str, str]:
+    """Mint a session token from an email and password."""
+    try:
+        identity = auth.authenticate_password(body.email, body.password)
+        return {
+            "token": auth.mint_token(identity.role, subject=identity.email),
+            "role": identity.role,
+        }
+    except auth.AuthError:
+        logger.warning("Password sign-in rejected")
+        raise _GENERIC_401 from None
+    except auth.AuthConfigError as exc:
+        logger.error("Password sign-in misconfigured: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

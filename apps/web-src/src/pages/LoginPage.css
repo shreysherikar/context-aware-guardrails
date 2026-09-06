@@ -239,6 +239,12 @@
   gap: 1rem;
 }
 
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .login-field label {
   font-size: 12px;
   font-weight: 400;
@@ -265,13 +271,6 @@
   outline: none;
   border-color: var(--accent);
   box-shadow: var(--focus-ring);
-}
-
-.login-server-hint {
-  margin: -0.35rem 0 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-muted);
 }
 
 .login-chip-row {

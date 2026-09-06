@@ -1,54 +1,45 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiFetch, getApiBase, isNativeApp, setApiBase } from '../api';
+import { apiFetch } from '../api';
 import { Sun, Moon } from 'lucide-react';
 import LoginBrandPanel from '../components/login/LoginBrandPanel';
 import LoginPanelDecor from '../components/login/LoginPanelDecor';
 import './LoginPage.css';
 
-const EXAMPLE_ROLES = ['clinician', 'marketing', 'admin', 'employee'];
-
 // Google Identity Services client ID (from apps/web-src/.env.production).
-// When unset, the Google button is hidden and only the dev-mode form shows.
+// When unset, the Google button is hidden and only the email/password form shows.
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 /**
  * Standalone login page (Concord-inspired split layout).
- * Calls POST /auth/dev-token. Token is kept in memory only.
+ * Calls POST /auth/login. Token is kept in memory only.
  */
 export default function LoginPage() {
   const { auth, login } = useAuth();
   const { resolved, toggleTheme } = useTheme();
-  const [role, setRole] = useState('');
-  const [serverUrl, setServerUrl] = useState(() => getApiBase());
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const native = isNativeApp();
   const googleButtonRef = useRef(null);
-  const serverUrlRef = useRef(serverUrl);
-  serverUrlRef.current = serverUrl;
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const r = role.trim();
-    if (!r) return;
-    setApiBase(serverUrl);
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch('/auth/dev-token', {
+      const data = await apiFetch('/auth/login', {
         method: 'POST',
-        body: { role: r },
+        body: { email: trimmedEmail, password },
       });
       if (!data?.token) throw { status: 0, message: 'No token in response.', type: 'server' };
-      login(data.token, r);
+      login(data.token, data.role);
     } catch (err) {
-      if (err.status === 404) {
-        setError(
-          'Dev token issuance is disabled on this server. ' +
-          'Set AUTH_DEV_MODE=true in .env and restart the backend to enable it.'
-        );
+      if (err.status === 401) {
+        setError('Email or password is incorrect.');
       } else {
         setError(err.message || 'Login failed — check the backend is running.');
       }
@@ -74,7 +65,6 @@ export default function LoginPage() {
       }
       setLoading(true);
       setError(null);
-      setApiBase(serverUrlRef.current);
       try {
         const data = await apiFetch('/auth/google', {
           method: 'POST',
@@ -154,51 +144,29 @@ export default function LoginPage() {
 
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-field">
-              <label htmlFor="login-server">Server</label>
+              <label htmlFor="login-email">Email</label>
               <input
-                id="login-server"
-                type="text"
-                value={serverUrl}
-                onChange={(e) => setServerUrl(e.target.value)}
-                placeholder={native ? 'http://192.168.1.10:18765' : 'Leave blank on this computer'}
-                autoComplete="off"
-                spellCheck="false"
-                inputMode="url"
-              />
-            </div>
-            {native && (
-              <p className="login-server-hint">
-                Use the phone URL shown in the desktop app title. This PC must be running
-                ContextGuard on the same Wi-Fi.
-              </p>
-            )}
-
-            <div className="login-field">
-              <label htmlFor="login-role">Role</label>
-              <input
-                id="login-role"
-                type="text"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                placeholder="e.g. clinician, marketing, admin…"
-                autoComplete="off"
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                autoComplete="username"
                 spellCheck="false"
                 autoFocus
               />
             </div>
 
-            <div className="login-chip-row">
-              {EXAMPLE_ROLES.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  className="login-chip"
-                  onClick={() => setRole(r)}
-                  aria-label={`Set role to ${r}`}
-                >
-                  {r}
-                </button>
-              ))}
+            <div className="login-field">
+              <label htmlFor="login-password">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
             </div>
 
             {error && <p className="login-error">{error}</p>}
@@ -206,10 +174,10 @@ export default function LoginPage() {
             <button
               type="submit"
               className="login-submit"
-              disabled={loading || !role.trim()}
+              disabled={loading || !email.trim() || !password}
               aria-busy={loading}
             >
-              {loading ? 'Minting token…' : 'Continue'}
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
 
@@ -227,8 +195,8 @@ export default function LoginPage() {
           )}
 
           <p className="login-footnote">
-            Dev-mode JWT via <code>POST /auth/dev-token</code>. Token stays in page memory only.
-            Role is embedded in the JWT for policy enforcement.
+            Local accounts use <code>clinician@contextguard.local</code> / <code>clinician</code>
+            (same pattern for admin, marketing, employee). Token stays in page memory only.
           </p>
         </div>
       </main>

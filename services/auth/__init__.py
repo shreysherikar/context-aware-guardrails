@@ -15,10 +15,18 @@ from services.auth.google_auth import (
     get_google_verifier,
     is_email_allowed,
 )
+from services.auth.password import (
+    DEFAULT_DESKTOP_USERS,
+    PasswordIdentity,
+    authenticate_password,
+)
 
 __all__ = [
     "AuthConfigError",
     "AuthError",
+    "DEFAULT_DESKTOP_USERS",
+    "PasswordIdentity",
+    "authenticate_password",
     "GoogleAuthError",
     "GoogleIdTokenVerifier",
     "GoogleIdentity",

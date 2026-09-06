@@ -159,6 +159,30 @@ def test_dev_token_works_and_produces_accepted_token(monkeypatch):
     assert verify_token(token) == "clinician"
 
 
+def test_password_login_401_when_users_unset():
+    resp = client.post(
+        "/auth/login",
+        json={"email": "clinician@acme.com", "password": "secret"},
+    )
+    assert resp.status_code == 401
+
+
+def test_password_login_works_and_produces_accepted_token(monkeypatch):
+    monkeypatch.setenv("AUTH_PASSWORD_USERS", "clinician@acme.com:secret:clinician")
+    resp = client.post(
+        "/auth/login",
+        json={"email": "Clinician@Acme.com", "password": "secret"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    token = body["token"]
+    assert body["role"] == "clinician"
+
+    from services.auth import verify_token
+
+    assert verify_token(token) == "clinician"
+
+
 # ---------------------------------------------------------------------------
 # Google ID-token sign-in gated by the permanent allowlist
 # ---------------------------------------------------------------------------

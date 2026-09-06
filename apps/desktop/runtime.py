@@ -17,6 +17,7 @@ from apps.desktop.paths import (
     executable_dir,
     persist_jwt_secret,
 )
+from services.auth.password import DEFAULT_DESKTOP_USERS
 
 DEFAULT_PORT = 18765
 HEALTH_TIMEOUT_SECONDS = 30.0
@@ -26,7 +27,7 @@ def configure_desktop_environment() -> Path:
     """Point the API at bundled assets and writable user-data databases.
 
     Must run before `apps.api.main` is imported. Login is always enabled in
-    the desktop build (`AUTH_DEV_MODE=true`) so testers can pick a role.
+    the desktop build (`AUTH_DEV_MODE=true`) with local email/password accounts.
     """
     data_dir = ensure_user_data_dir()
     root = bundle_root()
@@ -39,6 +40,8 @@ def configure_desktop_environment() -> Path:
     os.environ["AUTH_DEV_MODE"] = "true"
     if not os.getenv("AUTH_JWT_SECRET", "").strip():
         os.environ["AUTH_JWT_SECRET"] = persist_jwt_secret(data_dir / "jwt_secret")
+    if not os.getenv("AUTH_PASSWORD_USERS", "").strip():
+        os.environ["AUTH_PASSWORD_USERS"] = DEFAULT_DESKTOP_USERS
 
     os.environ.setdefault("POLICY_PATH", str(root / "policies" / "policy.yaml"))
     os.environ.setdefault("EVIDENCE_CORPUS_PATH", str(root / "evidence" / "approved_sources.yaml"))
