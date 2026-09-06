@@ -47,7 +47,16 @@ def configure_desktop_environment() -> Path:
     os.environ["GUARDRAIL_REVIEW_DB_PATH"] = str(data_dir / "guardrail_review.db")
     os.environ.setdefault("LLM_PROVIDER", "mock")
     os.environ.setdefault("OPTICAL_OCR_PROVIDER", "mock")
+    _set_if_blank("LLM_GENERATION_PROVIDER", "ollama")
+    _set_if_blank("OLLAMA_MODEL", "llama3.2:3b")
+    _set_if_blank("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    _set_if_blank("OLLAMA_TIMEOUT", "600")
     return data_dir
+
+
+def _set_if_blank(name: str, value: str) -> None:
+    if not os.getenv(name, "").strip():
+        os.environ[name] = value
 
 
 def pick_port(preferred: int = DEFAULT_PORT) -> int:

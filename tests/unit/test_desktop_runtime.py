@@ -32,6 +32,10 @@ def test_configure_desktop_environment_sets_writable_paths(monkeypatch, tmp_path
     monkeypatch.setenv("GUARDRAIL_REVIEW_DB_PATH", str(tmp_path / "ignored-review.db"))
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     monkeypatch.setenv("OPTICAL_OCR_PROVIDER", "mock")
+    monkeypatch.delenv("LLM_GENERATION_PROVIDER", raising=False)
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_TIMEOUT", raising=False)
 
     data_dir = configure_desktop_environment()
 
@@ -45,6 +49,9 @@ def test_configure_desktop_environment_sets_writable_paths(monkeypatch, tmp_path
     assert Path(os.environ["POLICY_PATH"]).name == "policy.yaml"
     assert Path(os.environ["POLICY_PATH"]).is_file()
     assert Path(os.environ["EVIDENCE_CORPUS_PATH"]).name == "approved_sources.yaml"
+    assert os.environ["LLM_GENERATION_PROVIDER"] == "ollama"
+    assert os.environ["OLLAMA_MODEL"] == "llama3.2:3b"
+    assert os.environ["OLLAMA_BASE_URL"] == "http://127.0.0.1:11434"
 
 
 def test_pick_port_returns_open_localhost_port():
