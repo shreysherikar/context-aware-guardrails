@@ -19,9 +19,12 @@ const STORAGE_KEY = 'contextguard-api-base';
 
 function servedFromLocalApi() {
   if (typeof window === 'undefined') return false;
+  // Capacitor loads the UI from https://localhost; that is not the API.
+  if (typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+    return false;
+  }
   const host = window.location.hostname;
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
-  if (window.location.protocol === 'capacitor:') return true;
   return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host);
 }
 

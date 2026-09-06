@@ -21,4 +21,4 @@ cd android && ./gradlew assembleDebug
 ```
 
 Install `android/app/build/outputs/apk/debug/app-debug.apk` on the phone.
-On first launch, set **Server** to the PC phone URL.
+Sign in with email and password, or Google.
