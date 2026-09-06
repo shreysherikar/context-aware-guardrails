@@ -47,7 +47,8 @@ PHARMA_ENVIRONMENTS: dict[str, ComputerEnvironment] = {
         allowed_directories=["/sandbox/clinical"],
         blocked_directories=["/etc", "/root", "C:\\Windows"],
         default_risk_limit=RiskLevel.LOW,
-        default_actions=_LOW_ACTIONS + [
+        default_actions=_LOW_ACTIONS
+        + [
             ComputerPermission.COMPUTER_READ_FILE.value,
             ComputerPermission.COMPUTER_BROWSER_NAVIGATION.value,
         ],

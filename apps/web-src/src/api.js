@@ -2,7 +2,7 @@
  * Centralized API client.
  *
  * Attaches Authorization: Bearer <token> when present, centralizes base URL
- * (empty string / same-origin in production, proxied in dev via vite.config),
+ * (VITE_API_BASE_URL when set, otherwise same-origin; proxied in dev via vite.config),
  * and normalizes error handling into a consistent shape components can render.
  */
 
@@ -41,7 +41,9 @@ export function setApiBase(base) {
 
 export function apiUrl(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
-  const base = getApiBase();
+  const nativeBase = isNativeApp() ? getApiBase() : '';
+  const envBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+  const base = nativeBase || envBase;
   return base ? `${base}${normalized}` : normalized;
 }
 

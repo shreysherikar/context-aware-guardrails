@@ -24,7 +24,9 @@ class MultimodalAssessment(BaseModel):
 
     risk_level: RiskLevel = RiskLevel.LOW
     decision: str = "ALLOW"  # ALLOW | REWRITE | REVIEW | BLOCK
-    rewrite_mode: str = "PASS"  # PASS | ANNOTATE | REDACT | MASK | REMOVE | SAFE_REWRITE | REVIEW | BLOCK
+    rewrite_mode: str = (
+        "PASS"  # PASS | ANNOTATE | REDACT | MASK | REMOVE | SAFE_REWRITE | REVIEW | BLOCK
+    )
     categories: list[str] = Field(default_factory=list)
     elements: list[ExtractedElement] = Field(default_factory=list)
     injection_detected: bool = False

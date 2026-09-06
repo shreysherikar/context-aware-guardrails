@@ -4,13 +4,12 @@ from unittest.mock import patch
 
 import pytest
 
-from services.web_bridge.models import WebSource
+from services.web_bridge.models import WebSearchResult, WebSource
 from services.web_bridge.search import (
     augment_prompt_with_web_context,
     search_web,
     should_search_web,
 )
-from services.web_bridge.models import WebSearchResult
 
 
 def test_should_search_web_explicit():

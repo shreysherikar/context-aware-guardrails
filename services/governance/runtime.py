@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from domain.governance_enums import (
     GovernanceDecision,
@@ -15,9 +15,9 @@ from domain.governance_models import (
     AgentRegisterRequest,
     AgentRegistryEntry,
     ComputerActionResult,
-    GovernedRequest,
     GovernanceAuditRecord,
     GovernanceResponse,
+    GovernedRequest,
     RuntimeStatus,
     SafeRewriteResult,
 )
@@ -83,7 +83,7 @@ class GovernanceRuntime:
         self._audit_enabled = audit_enabled
         self._rewrite_enabled = rewrite_enabled
         self._active = True
-        self._started_at = datetime.now(timezone.utc)
+        self._started_at = datetime.now(UTC)
         self._stats = {
             "processed": 0,
             "allowed": 0,
@@ -201,7 +201,9 @@ class GovernanceRuntime:
             return GovernanceResponse(
                 request_id=req_id,
                 agent_id=agent_id,
-                decision=GovernanceDecision.BLOCK if id_event else GovernanceDecision.REVIEW_REQUIRED,
+                decision=GovernanceDecision.BLOCK
+                if id_event
+                else GovernanceDecision.REVIEW_REQUIRED,
                 risk_level=self._risk.classify(governed.action, governed.data_classification),
                 policy_id="GOV-IDENTITY-FAIL",
                 reasons=[err or "Identity verification failed"],
@@ -214,8 +216,11 @@ class GovernanceRuntime:
         if not esc_ok:
             self._stats["blocked"] += 1
             resp = self._build_response(
-                request, GovernanceDecision.BLOCK, "GOV-ESCALATION-BLOCK",
-                ["Privilege escalation blocked"], blocked=True,
+                request,
+                GovernanceDecision.BLOCK,
+                "GOV-ESCALATION-BLOCK",
+                ["Privilege escalation blocked"],
+                blocked=True,
             )
             resp.security_event_id = esc_event.event_id if esc_event else None
             return self._audit_and_return(request, agent_entry, resp)
@@ -310,7 +315,8 @@ class GovernanceRuntime:
             approval_id=approval_id,
             approval_required=policy_result.approval_required,
             blocked=policy_result.blocked,
-            safe_rewrite_applied=rewrite_result is not None and rewrite_result.status != RewriteStatus.SAFE,
+            safe_rewrite_applied=rewrite_result is not None
+            and rewrite_result.status != RewriteStatus.SAFE,
             rewrite_status=rewrite_result.status if rewrite_result else None,
             rewrite_transformations=rewrite_result.transformations if rewrite_result else [],
             detected_threats=rewrite_result.detected_threats if rewrite_result else [],
@@ -352,7 +358,9 @@ class GovernanceRuntime:
             )
         _, rewrite_result = self._safe_rewrite.rewrite_governed(governed, agent)
         return self._computer.execute_action(
-            session_id, governed, agent,
+            session_id,
+            governed,
+            agent,
             rewrite_result=rewrite_result,
             approval_id=approval_id,
         )
@@ -404,16 +412,18 @@ class GovernanceRuntime:
         result: SafeRewriteResult,
         decision: GovernanceDecision,
     ) -> None:
-        self._recent_rewrites.append({
-            "request_id": governed.request_id,
-            "agent_id": governed.agent_id,
-            "status": result.status.value,
-            "transformations": result.transformations,
-            "threats": result.detected_threats,
-            "decision": decision.value,
-            "confidence": result.confidence,
-            "original_hash": result.original_hash,
-        })
+        self._recent_rewrites.append(
+            {
+                "request_id": governed.request_id,
+                "agent_id": governed.agent_id,
+                "status": result.status.value,
+                "transformations": result.transformations,
+                "threats": result.detected_threats,
+                "decision": decision.value,
+                "confidence": result.confidence,
+                "original_hash": result.original_hash,
+            }
+        )
         if len(self._recent_rewrites) > 200:
             self._recent_rewrites = self._recent_rewrites[-200:]
 
@@ -470,9 +480,7 @@ class GovernanceRuntime:
             request_id=request.identity.request_id,
             agent_id=request.identity.agent_id,
             decision=decision,
-            risk_level=self._risk.classify(
-                request.requested_action, request.data_classification
-            ),
+            risk_level=self._risk.classify(request.requested_action, request.data_classification),
             policy_id="GOV-FAIL-CLOSED",
             reasons=[reason],
             blocked=True,
@@ -491,9 +499,7 @@ class GovernanceRuntime:
             request_id=request.identity.request_id,
             agent_id=request.identity.agent_id,
             decision=decision,
-            risk_level=self._risk.classify(
-                request.requested_action, request.data_classification
-            ),
+            risk_level=self._risk.classify(request.requested_action, request.data_classification),
             policy_id=policy_id,
             reasons=reasons,
             blocked=blocked,

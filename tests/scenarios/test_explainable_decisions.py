@@ -108,7 +108,7 @@ def test_sanitization_failure_review(monkeypatch):
 
 def test_policy_engine_no_match_review():
     from domain.enums import PolicyAction, RiskCategory, RiskLevel
-    from domain.models import PolicyDecision, RiskAssessment
+    from domain.models import RiskAssessment
     from services.policy_engine.engine import PolicyEngine
 
     engine = PolicyEngine()
@@ -204,9 +204,9 @@ def test_groq_classifier_timeout_review(monkeypatch):
         raise APITimeoutError(request)
 
     classifier = GroqRiskClassifier(
-        api_key="test-key", model="m-test", client=SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=_timeout))
-        ),
+        api_key="test-key",
+        model="m-test",
+        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_timeout))),
     )
     monkeypatch.setattr("apps.api.main.classifier", classifier)
 

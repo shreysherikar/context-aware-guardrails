@@ -8,7 +8,7 @@ from domain.governance_models import AgentActionRequest, AgentRegistryEntry, Gov
 from services.cyber_safety.darkweb import assess_darkweb_content, extract_text_for_assessment
 from services.governance.data_access import DataAccessController
 from services.governance.permissions import PermissionEngine
-from services.governance.risk import GovernanceRiskEngine, RISK_ORDER
+from services.governance.risk import RISK_ORDER, GovernanceRiskEngine
 
 
 class GovernancePolicyEngine:
@@ -64,7 +64,9 @@ class GovernancePolicyEngine:
                 if self._permissions.requires_human_approval(
                     action, set(agent.human_approval_required)
                 ):
-                    risk = self._risk.classify(action, request.data_classification, is_restricted=True)
+                    risk = self._risk.classify(
+                        action, request.data_classification, is_restricted=True
+                    )
                     return GovernancePolicyResult(
                         decision=GovernanceDecision.HUMAN_APPROVAL_REQUIRED,
                         risk_level=risk,
@@ -116,8 +118,7 @@ class GovernancePolicyEngine:
 
         # Purpose check — must be non-empty for sensitive+ data
         if (
-            request.data_classification.value
-            in ("SENSITIVE", "RESTRICTED", "CRITICAL")
+            request.data_classification.value in ("SENSITIVE", "RESTRICTED", "CRITICAL")
             and not request.purpose
         ):
             return GovernancePolicyResult(
@@ -137,7 +138,9 @@ class GovernancePolicyEngine:
                 decision=GovernanceDecision.BLOCK,
                 risk_level=risk,
                 policy_id="GOV-RISK-EXCEEDED",
-                reasons=[f"Action risk {risk.value} exceeds agent max {agent.max_risk_level.value}"],
+                reasons=[
+                    f"Action risk {risk.value} exceeds agent max {agent.max_risk_level.value}"
+                ],
                 blocked=True,
             )
 

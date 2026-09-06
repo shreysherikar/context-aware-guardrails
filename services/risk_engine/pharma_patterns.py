@@ -10,7 +10,8 @@ PHARMA_RISK_PATTERNS: list[tuple[str, RiskCategory, str]] = [
     (
         r"increase prescription",
         RiskCategory.OFF_LABEL,
-        "Promotional outcome ('increase prescriptions') without approved indication or fair balance.",
+        "Promotional outcome ('increase prescriptions') without approved "
+        "indication or fair balance.",
     ),
     (
         r"which hcps? to priorit",

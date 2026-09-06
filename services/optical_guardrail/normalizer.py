@@ -59,7 +59,9 @@ def normalize_optical_assessment(assessment: OpticalAssessment) -> RiskAssessmen
     has_malware = any(f.category == RiskCategory.MALWARE for f in assessment.findings)
     has_phishing = any(f.category == RiskCategory.PHISHING for f in assessment.findings)
     has_cyber = any(f.category == RiskCategory.CYBER_SAFETY for f in assessment.findings)
-    has_multimodal = any(f.category == RiskCategory.MULTIMODAL_UNTRUSTED for f in assessment.findings)
+    has_multimodal = any(
+        f.category == RiskCategory.MULTIMODAL_UNTRUSTED for f in assessment.findings
+    )
 
     has_manufacturing = "MANUFACTURING_SAFETY_VIOLATION" in (assessment.multimodal_categories or [])
     has_regulatory = "REGULATORY_MANIPULATION_ATTEMPT" in (assessment.multimodal_categories or [])

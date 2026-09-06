@@ -133,6 +133,5 @@ def review_text(text: str) -> GxpReviewResult:
 
 def list_gxp_frameworks() -> list[dict[str, str]]:
     return [
-        {"code": code, "description": desc}
-        for code, desc in GXP_FRAMEWORK_DESCRIPTIONS.items()
+        {"code": code, "description": desc} for code, desc in GXP_FRAMEWORK_DESCRIPTIONS.items()
     ]

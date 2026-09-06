@@ -5,15 +5,13 @@ from __future__ import annotations
 import re
 
 from domain.enums import RiskLevel
-
 from services.multimodal.models import ExtractedElement, MultimodalAssessment
 from services.multimodal.patterns import (
-    ALL_THREAT_PATTERNS,
     _EDUCATIONAL,
     _QR_HINT,
     _RISK_ORDER,
     _URL_EXTRACT,
-    ThreatPattern,
+    ALL_THREAT_PATTERNS,
 )
 
 _UNTRUSTED_INSTRUCTION_BLOCK = re.compile(
@@ -27,7 +25,9 @@ def _max_risk(a: RiskLevel, b: RiskLevel) -> RiskLevel:
     return a if _RISK_ORDER[a] >= _RISK_ORDER[b] else b
 
 
-def _scan_patterns(text: str) -> tuple[list[ExtractedElement], list[str], RiskLevel, dict[str, bool]]:
+def _scan_patterns(
+    text: str,
+) -> tuple[list[ExtractedElement], list[str], RiskLevel, dict[str, bool]]:
     elements: list[ExtractedElement] = []
     categories: list[str] = []
     risk = RiskLevel.LOW

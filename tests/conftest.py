@@ -38,12 +38,39 @@ os.environ.setdefault("CLAIM_VERIFICATION_PROVIDER", "")
 os.environ.setdefault("OPTICAL_OCR_PROVIDER", "mock")
 os.environ.setdefault("AGENT_LLM_FEEDBACK", "false")
 
+# Storage isolation: the persistence modules (services/audit, services/governance,
+# services/guardrail_review) switch to PostgreSQL whenever DATABASE_URL is set, and
+# apps/api/main.py's load_dotenv() would otherwise inject a developer's local .env
+# DATABASE_URL into the test process. Forced (not setdefault) so an exported
+# DATABASE_URL cannot flip the suite onto a real network database either — tests
+# must stay deterministic and offline on the per-test SQLite files. Tests that
+# verify the PostgreSQL path can still monkeypatch.setenv("DATABASE_URL", ...).
+os.environ["DATABASE_URL"] = ""
+
+# CORS/static-mount determinism: force a fixed browser allowlist (the CORS tests
+# assert on exactly these origins) and keep the same-origin static mount active
+# (existing web_ui coverage). Forced, not setdefault, so a local .env cannot
+# change observable app behaviour mid-suite; tests covering the off-by-default
+# mount gate spawn a fresh subprocess instead (see tests/scenarios/test_web_ui.py).
+os.environ["ALLOWED_ORIGINS"] = "https://d123abc.cloudfront.net,http://localhost:5173"
+os.environ["SERVE_STATIC_FRONTEND"] = "true"
+
 # Auth bootstrap: dev mode off (safe default), test signing secret on. Forced
 # (not setdefault) for DEV_MODE so a local .env cannot flip it on and change
 # which endpoints exist during a test run. The secret is >=32 bytes so HMAC-SHA256
 # signing does not emit PyJWT InsecureKeyLengthWarning noise across the suite.
 os.environ["AUTH_DEV_MODE"] = "false"
 os.environ.setdefault("AUTH_JWT_SECRET", "unit-test-signing-secret-0123456789abcdef")
+
+# Google sign-in: client ID and allowlist forced EMPTY so /auth/google fails
+# closed (503/403) in the default suite — the endpoint must never be reachable
+# without explicit operator configuration. Tests that exercise the Google path
+# set GOOGLE_CLIENT_ID / GOOGLE_ALLOWED_* themselves, and /auth/google's
+# success-path scenario monkeypatches the verifier directly.
+os.environ["GOOGLE_CLIENT_ID"] = ""
+os.environ["GOOGLE_ALLOWED_EMAILS"] = ""
+os.environ["GOOGLE_ALLOWED_DOMAINS"] = ""
+os.environ["GOOGLE_DEFAULT_ROLE"] = ""
 
 import pytest  # noqa: E402
 

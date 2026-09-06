@@ -246,7 +246,9 @@ class OpticalAnalyzer:
                     )
                 )
 
-        document_type = _infer_document_type(findings, clinical_hits, injection_detected, multimodal)
+        document_type = _infer_document_type(
+            findings, clinical_hits, injection_detected, multimodal
+        )
         confidence = ocr.confidence
         if findings:
             confidence = max(confidence, max(f.confidence for f in findings), multimodal.confidence)

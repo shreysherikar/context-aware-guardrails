@@ -28,9 +28,7 @@ def test_route_analytics():
 
 
 def test_route_research_with_web_flag():
-    plan = route_request(
-        RoutingContext(prompt="What is our internal policy?", use_web_search=True)
-    )
+    plan = route_request(RoutingContext(prompt="What is our internal policy?", use_web_search=True))
     assert plan.needs_web_search is True
     assert any(a.id == "research" for a in plan.active_agents)
 

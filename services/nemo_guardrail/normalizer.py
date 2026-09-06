@@ -23,8 +23,7 @@ _SENSITIVITY_RANK: dict[DataSensitivity, int] = {
 
 # Generic internal suffix — never names NeMo, Colang, or rail identifiers.
 _FAIL_CLOSED_SUFFIX = (
-    "An additional defense-in-depth safety check could not complete; "
-    "treating as high risk."
+    "An additional defense-in-depth safety check could not complete; treating as high risk."
 )
 _BLOCKED_SUFFIX = "Blocked by an additional defense-in-depth safety check."
 _MODIFIED_SUFFIX = "Modified by an additional defense-in-depth safety check."

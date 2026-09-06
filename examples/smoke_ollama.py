@@ -44,13 +44,17 @@ def main() -> int:
 
     boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
     body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="conversation_id"\r\n\r\n'
-        f"smoke-image\r\n"
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="image"; filename="safe_brochure.png"\r\n'
-        f"Content-Type: image/png\r\n\r\n"
-    ).encode() + image_bytes + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="conversation_id"\r\n\r\n'
+            f"smoke-image\r\n"
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="image"; filename="safe_brochure.png"\r\n'
+            f"Content-Type: image/png\r\n\r\n"
+        ).encode()
+        + image_bytes
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
 
     req = urllib.request.Request(
         f"{BASE}/guardrail/evaluate-image",

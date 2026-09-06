@@ -2,30 +2,26 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from domain.enums import RiskLevel
 from domain.governance_enums import (
-    ActionPermission,
     AgentStatus,
     ApprovalStatus,
     DataClassification,
-    DataPermission,
     GovernanceDecision,
     RequestType,
-    RestrictedAction,
     RewriteStatus,
     SecurityEventCategory,
     SecurityEventSeverity,
-    ToolPermission,
 )
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class AgentRegistryEntry(BaseModel):

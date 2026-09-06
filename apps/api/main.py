@@ -19,6 +19,7 @@ import hashlib
 import logging
 import os
 import uuid
+from typing import cast
 
 # Load local environment (.env) before importing anything that reads
 # environment variables, so the config documented in .env.example actually works
@@ -44,6 +45,7 @@ from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+from apps.api.governance_routes import router as governance_router  # noqa: E402
 from domain.enums import PolicyAction, ResolutionType, ReviewRequestStatus, RiskLevel  # noqa: E402
 from domain.models import (  # noqa: E402
     AuditEvent,
@@ -59,16 +61,28 @@ from domain.models import (  # noqa: E402
     SanitizationAuditMeta,
     TrajectoryAssessment,
 )
-from services.explanation.builder import build_explainable_decision, build_rephrase_suggestion  # noqa: E402
-from services.guardrail_review.models import EvaluationSnapshot  # noqa: E402
-from services.guardrail_review.store import get_review_store  # noqa: E402
 from services import auth  # noqa: E402
+from services.agent import GuardrailAgent  # noqa: E402
+from services.agent.models import AgentChatResponse  # noqa: E402
 from services.audit.audit import list_events, log_event  # noqa: E402
+from services.auth.google_auth import (  # noqa: E402
+    default_role_for_email,
+    get_google_verifier,
+    is_email_allowed,
+)
 from services.claim_verification import build_audit_meta  # noqa: E402
 from services.claim_verification.factory import get_claim_verifier  # noqa: E402
 from services.claim_verification.models import unverified_failure_response  # noqa: E402
+from services.explanation.builder import (  # noqa: E402
+    build_explainable_decision,
+    build_rephrase_suggestion,
+)
+from services.governance.runtime import get_runtime  # noqa: E402
+from services.guardrail_review.models import EvaluationSnapshot  # noqa: E402
+from services.guardrail_review.store import get_review_store  # noqa: E402
 from services.llm import LLMRequest  # noqa: E402
 from services.llm.factory import get_gateway  # noqa: E402
+from services.nemo_guardrail.factory import get_nemo_dialog_rail, get_nemo_input_rail  # noqa: E402
 from services.optical_guardrail.analyzer import OpticalAnalyzer  # noqa: E402
 from services.optical_guardrail.factory import get_ocr_provider  # noqa: E402
 from services.optical_guardrail.normalizer import normalize_optical_assessment  # noqa: E402
@@ -78,13 +92,12 @@ from services.output_guardrail.factory import get_output_guardrail  # noqa: E402
 from services.policy_engine.engine import PolicyEngine  # noqa: E402
 from services.risk_engine.factory import get_classifier  # noqa: E402
 from services.sanitization.factory import get_sanitization_engine  # noqa: E402
-from services.sanitization.models import SanitizationRequest, SanitizationResult  # noqa: E402
+from services.sanitization.models import (  # noqa: E402
+    SanitizationRequest,
+    SanitizationResult,
+    SourceType,
+)
 from services.trajectory_engine.engine import evaluate_conversation  # noqa: E402
-from services.nemo_guardrail.factory import get_nemo_dialog_rail, get_nemo_input_rail  # noqa: E402
-from services.agent import GuardrailAgent  # noqa: E402
-from services.agent.models import AgentChatResponse  # noqa: E402
-from apps.api.governance_routes import router as governance_router  # noqa: E402
-from services.governance.runtime import get_runtime  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +112,30 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# CORS: the API authenticates callers via verified bearer tokens, so browser
+# cross-origin access is allowlisted explicitly — never "*" (wildcard origins
+# with credentials are both insecure and rejected by browsers anyway).
+# ALLOWED_ORIGINS is a comma-separated list, e.g.
+# "https://d123abc.cloudfront.net,http://localhost:5173". Unset/empty = no
+# cross-origin browser access; non-browser clients (curl, other services) are
+# unaffected.
+_allowed_origins = [
+    origin.strip() for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",") if origin.strip()
+]
+if "*" in _allowed_origins:
+    raise RuntimeError(
+        "ALLOWED_ORIGINS must not contain '*': wildcard origins with "
+        "allow_credentials=True are rejected by browsers and insecure for a "
+        "bearer-token API."
+    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Always-active governance runtime — starts at import, independent of agent sessions.
@@ -119,6 +156,9 @@ sanitization_engine = get_sanitization_engine()
 nemo_input_rail = get_nemo_input_rail()
 nemo_dialog_rail = get_nemo_dialog_rail()
 review_store = get_review_store()
+# Google ID-token sign-in — one verifier per process, bound to GOOGLE_CLIENT_ID
+# at startup. POST /auth/google fails closed (503) while that env var is unset.
+google_verifier = get_google_verifier()
 agent = GuardrailAgent(
     classifier=classifier,
     policy_engine=policy_engine,
@@ -293,8 +333,19 @@ def _flagged_for_review_response() -> dict[str, object]:
 
 def _claims_review_response(
     *,
+    request_id: str,
     decision: PolicyDecision,
     risk: RiskAssessment,
+    conversation_id: str,
+    user_role: str,
+    audit_prompt: str,
+    llm_result: LLMResult,
+    output_result: OutputGuardrailResult,
+    claim_verification: ClaimVerificationMeta | None = None,
+    sanitization: SanitizationAuditMeta | None = None,
+    optical: OpticalAuditMeta | None = None,
+    input_type: str = "text",
+    original_prompt: str | None = None,
     extra: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Post-generation policy outcome changed (e.g. EVIDENCE-001 claims REVIEW).
@@ -309,6 +360,40 @@ def _claims_review_response(
     }
     if extra:
         body.update(extra)
+    effective = _effective_action(decision)
+    explanation = _attach_explanation(
+        body,
+        request_id=request_id,
+        risk=risk,
+        decision=decision,
+        effective_action=effective,
+        input_type=input_type,
+        original_prompt=original_prompt,
+        llm_result=llm_result,
+        output_result=output_result,
+    )
+    _save_evaluation_snapshot(
+        request_id=request_id,
+        conversation_id=conversation_id,
+        user_role=user_role,
+        decision=decision,
+        effective=effective,
+        prompt=original_prompt or audit_prompt,
+        input_type=input_type,
+    )
+    _audit_from_explanation(
+        conversation_id=conversation_id,
+        prompt=audit_prompt,
+        user_role=user_role,
+        risk=risk,
+        decision=decision,
+        explanation=explanation,
+        llm=llm_result,
+        output_guardrail=output_result,
+        optical=optical,
+        sanitization=sanitization,
+        claim_verification=claim_verification,
+    )
     return body
 
 
@@ -345,6 +430,44 @@ def issue_dev_token(body: DevTokenRequest) -> dict[str, str]:
     except auth.AuthConfigError as exc:
         logger.error("Dev-token issuance misconfigured: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class GoogleTokenRequest(BaseModel):
+    id_token: str
+
+
+@app.post("/auth/google")
+def authenticate_google(body: GoogleTokenRequest) -> dict[str, str]:
+    """Exchange a Google ID token for a context-aware-guardrail session token.
+
+    The Google ID token is verified server-side (signature + audience against
+    GOOGLE_CLIENT_ID + email verification), then the verified email MUST pass
+    the permanent allowlist (GOOGLE_ALLOWED_EMAILS / GOOGLE_ALLOWED_DOMAINS)
+    before any token is minted — this gate is independent of the Google Cloud
+    app's "Testing" status.
+
+    Fail closed: an unconfigured allowlist rejects everyone (403); an
+    unconfigured client ID returns 503 (operator misconfiguration). Rejection
+    reasons and allowlist contents never reach the caller.
+    """
+    try:
+        identity = google_verifier.verify_token(body.id_token)
+    except auth.AuthConfigError as exc:
+        logger.error("Google sign-in is not configured: %s", exc)
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.") from exc
+    except auth.AuthError as exc:
+        logger.warning("Google sign-in rejected: %s", exc)
+        raise _GENERIC_401 from exc
+
+    if not is_email_allowed(identity.email):
+        logger.warning("Google sign-in denied for unlisted account: %s", identity.email)
+        raise HTTPException(
+            status_code=403,
+            detail="This account is not authorized for this application.",
+        )
+
+    role = default_role_for_email(identity.email)
+    return {"token": auth.mint_token(role, subject=identity.email), "role": role}
 
 
 @app.exception_handler(Exception)
@@ -608,7 +731,22 @@ def _generation_response(
         # Post-generation re-evaluation degraded the outcome (EVIDENCE-001 on
         # unsupported/contradicted claims): route to review instead of ever
         # returning the generated content.
-        return _claims_review_response(decision=decision, risk=risk, extra=extra)
+        return _claims_review_response(
+            request_id=request_id,
+            decision=decision,
+            risk=risk,
+            conversation_id=conversation_id,
+            user_role=user_role,
+            audit_prompt=audit_prompt,
+            llm_result=llm_result,
+            output_result=output_result,
+            claim_verification=claim_verification,
+            sanitization=sanitization,
+            optical=optical,
+            input_type=input_type,
+            original_prompt=original_prompt,
+            extra=extra,
+        )
 
     if llm_result.attempted and not llm_result.succeeded:
         return JSONResponse(
@@ -1252,7 +1390,10 @@ async def forward_review_request(
 
     if decision.action == PolicyAction.REWRITE:
         san_result = _run_sanitization(
-            SanitizationRequest(text=snapshot.prompt, source_type=snapshot.input_type)
+            SanitizationRequest(
+                text=snapshot.prompt,
+                source_type=cast(SourceType, snapshot.input_type),
+            )
         )
         if not san_result.success:
             raise HTTPException(
@@ -1348,11 +1489,14 @@ def list_audit_events(
 
 
 # Static ContextGuard dashboard (apps/web). Mounted LAST so API routes win.
+# Off by default: the frontend is deployed separately on S3/CloudFront. This
+# same-origin mount only activates when SERVE_STATIC_FRONTEND=true AND a built
+# bundle exists under apps/web. Kept (not deleted) — still useful for local dev
+# and all-in-one hosting.
 _WEB_DIR = Path(__file__).resolve().parents[1] / "web"
-if _WEB_DIR.is_dir():
+if os.environ.get("SERVE_STATIC_FRONTEND", "false").strip().lower() == "true" and _WEB_DIR.is_dir():
     app.mount(
         "/",
         StaticFiles(directory=_WEB_DIR, html=True),
         name="web",
     )
-

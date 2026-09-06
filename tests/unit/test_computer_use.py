@@ -1,5 +1,7 @@
 """Unit tests for governed computer-use capability."""
 
+from datetime import UTC
+
 import pytest
 
 from domain.enums import RiskLevel
@@ -147,10 +149,9 @@ def test_critical_action_requires_approval(engine, agent):
 
 def test_session_expiration(engine, agent):
     session = engine.create_session(agent, ttl_minutes=1)
-    from datetime import datetime, timedelta, timezone
-    expired = session.model_copy(
-        update={"expiry_time": datetime.now(timezone.utc) - timedelta(seconds=1)}
-    )
+    from datetime import datetime, timedelta
+
+    expired = session.model_copy(update={"expiry_time": datetime.now(UTC) - timedelta(seconds=1)})
     engine._sessions._sessions[session.session_id] = expired
     result = engine.execute_action(
         session.session_id,

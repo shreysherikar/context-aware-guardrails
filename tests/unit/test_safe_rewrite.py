@@ -65,7 +65,9 @@ def test_credential_redaction(engine):
     text = "Use api_key=sk-abcdefghijklmnopqrstuvwxyz12345 to connect."
     result = engine.sanitize(_governed(text))
     assert result.status == RewriteStatus.REWRITTEN
-    assert "CREDENTIAL_REDACTED" in result.rewritten_content or "credential" in str(result.transformations)
+    assert "CREDENTIAL_REDACTED" in result.rewritten_content or "credential" in str(
+        result.transformations
+    )
 
 
 def test_phi_redaction(engine):
@@ -122,8 +124,6 @@ def test_pipeline_integration(pipeline):
         requested_action="CREATE_DRAFT",
         payload={"text": "Patient: Jane Smith\nMRN: 99999"},
     )
-    governed, result = pipeline.rewrite_governed(
-        GovernedRequest.from_action_request(req)
-    )
+    governed, result = pipeline.rewrite_governed(GovernedRequest.from_action_request(req))
     assert result.status == RewriteStatus.REWRITTEN
     assert "Jane Smith" not in governed.arguments.get("text", "")

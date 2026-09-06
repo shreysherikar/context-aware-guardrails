@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 
 from domain.enums import RiskLevel
-
 from services.risk_engine.pharma_patterns import match_pharma_patterns
 
 
@@ -75,8 +74,9 @@ _PHARMA_GUIDANCE: list[tuple[str, PharmaGuidance]] = [
                 "Which approved evidence text should the slide be based on?",
             ],
             suggested_rewrite=(
-                "Using only provided approved evidence, draft a slide that accurately reflects "
-                "study limitations and required qualifiers. Do not strengthen claims beyond evidence."
+                "Using only provided approved evidence, draft a slide that accurately "
+                "reflects study limitations and required qualifiers. Do not strengthen claims "
+                "beyond evidence."
             ),
         ),
     ),
@@ -84,7 +84,8 @@ _PHARMA_GUIDANCE: list[tuple[str, PharmaGuidance]] = [
         r"likelihood to start therapy|targeting list|personalized campaigns",
         PharmaGuidance(
             clarification_questions=[
-                "Can segmentation use only consented, non-sensitive attributes (e.g., specialty, geography)?",
+                "Can segmentation use only consented, non-sensitive attributes "
+                "(e.g., specialty, geography)?"
             ],
             suggested_rewrite=(
                 "Propose segmentation rules based on non-sensitive, consented attributes "

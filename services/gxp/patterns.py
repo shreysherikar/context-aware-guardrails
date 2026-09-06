@@ -25,7 +25,8 @@ GXP_PATTERNS: list[GxpPattern] = [
         re.compile(r"(?i)\bskip\s+(?:informed\s+)?consent\b"),
         "informed_consent",
         ("GCP", "GDocP"),
-        "Informed consent cannot be skipped without documented, IRB/EC-approved exception criteria.",
+        "Informed consent cannot be skipped without documented, IRB/EC-approved "
+        "exception criteria.",
         "obtain documented informed consent per protocol and ICH E6(R3)",
         "Respect for persons — voluntary, documented consent before trial procedures.",
         "high",
@@ -52,7 +53,9 @@ GXP_PATTERNS: list[GxpPattern] = [
         ("ICH E6(R3) §5.5",),
     ),
     GxpPattern(
-        re.compile(r"(?i)\bmodify\s+(?:source|original)\s+data\b(?!\s+with\s+(?:audit|documented))"),
+        re.compile(
+            r"(?i)\bmodify\s+(?:source|original)\s+data\b(?!\s+with\s+(?:audit|documented))"
+        ),
         "data_integrity",
         ("GCP", "GDocP"),
         "Source data changes require documented corrections with audit trail — not silent edits.",
@@ -83,7 +86,9 @@ GXP_PATTERNS: list[GxpPattern] = [
     ),
     # --- GMP (Good Manufacturing Practice) ---
     GxpPattern(
-        re.compile(r"(?i)\b(?:skip|bypass|omit)\s+(?:qc|quality\s+control)\s+(?:testing|release)?\b"),
+        re.compile(
+            r"(?i)\b(?:skip|bypass|omit)\s+(?:qc|quality\s+control)\s+(?:testing|release)?\b"
+        ),
         "batch_release",
         ("GMP",),
         "Batch release requires completed QC testing and QA disposition.",
@@ -144,7 +149,9 @@ GXP_PATTERNS: list[GxpPattern] = [
         ("21 CFR Part 58", "OECD GLP"),
     ),
     GxpPattern(
-        re.compile(r"(?i)\b(?:omit|discard|destroy)\s+raw\s+data\b(?!\s+per\s+(?:approved|written))"),
+        re.compile(
+            r"(?i)\b(?:omit|discard|destroy)\s+raw\s+data\b(?!\s+per\s+(?:approved|written))"
+        ),
         "raw_data_retention",
         ("GLP", "GDocP"),
         "Raw data must be retained for the required retention period.",
@@ -155,7 +162,9 @@ GXP_PATTERNS: list[GxpPattern] = [
     ),
     # --- GVP (Good Pharmacovigilance Practice) ---
     GxpPattern(
-        re.compile(r"(?i)\b(?:do\s+not|don'?t|delay|withhold)\s+report\s+(?:saes?|serious\s+adverse\s+events?)\b"),
+        re.compile(
+            r"(?i)\b(?:do\s+not|don'?t|delay|withhold)\s+report\s+(?:saes?|serious\s+adverse\s+events?)\b"
+        ),
         "safety_reporting",
         ("GVP", "GCP"),
         "Serious adverse events must be reported within regulatory timelines.",
@@ -165,7 +174,9 @@ GXP_PATTERNS: list[GxpPattern] = [
         ("ICH E2A", "EU GVP Module VI"),
     ),
     GxpPattern(
-        re.compile(r"(?i)\b(?:hide|suppress|aggregate\s+and\s+hide)\s+(?:individual\s+)?(?:cases?|reports?)\b"),
+        re.compile(
+            r"(?i)\b(?:hide|suppress|aggregate\s+and\s+hide)\s+(?:individual\s+)?(?:cases?|reports?)\b"
+        ),
         "case_reporting",
         ("GVP",),
         "Individual case safety reports must not be suppressed or hidden.",
@@ -178,7 +189,8 @@ GXP_PATTERNS: list[GxpPattern] = [
         re.compile(r"(?i)\boff[- ]label\s+(?:promot|claim|recommend)\w*\b"),
         "promotional_compliance",
         ("GVP", "GCP"),
-        "Off-label promotion is restricted; medical information must stay within approved labeling.",
+        "Off-label promotion is restricted; medical information must stay within "
+        "approved labeling.",
         "limit communications to approved labeling; route off-label inquiries to medical affairs",
         "Approved labeling boundary for promotional content.",
         "high",
@@ -257,7 +269,9 @@ GXP_PATTERNS: list[GxpPattern] = [
         ("FDA promotional guidance",),
     ),
     GxpPattern(
-        re.compile(r"(?i)\bpatient(?:'s)?\s+(?:ssn|social\s+security|mrn|medical\s+record\s+number)\b"),
+        re.compile(
+            r"(?i)\bpatient(?:'s)?\s+(?:ssn|social\s+security|mrn|medical\s+record\s+number)\b"
+        ),
         "privacy",
         ("GCP", "GDocP"),
         "Patient identifiers should not appear in general documentation without justification.",

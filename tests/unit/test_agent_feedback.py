@@ -1,12 +1,14 @@
 """Unit tests for agent feedback builder."""
 
+from typing import Any
+
 from domain.enums import DataSensitivity, PolicyAction, RiskCategory, RiskLevel
-from domain.models import PolicyDecision, RiskAssessment
+from domain.models import RiskAssessment
 from services.agent.feedback import build_corrections, build_issues, compose_deterministic_message
 
 
 def _risk(**kwargs) -> RiskAssessment:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         risk_level=RiskLevel.MEDIUM,
         categories=[RiskCategory.PII],
         data_sensitivity=DataSensitivity.CONFIDENTIAL,

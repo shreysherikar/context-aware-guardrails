@@ -2,7 +2,6 @@
 
 import pytest
 
-from domain.enums import RiskLevel
 from domain.governance_enums import DataClassification, GovernanceDecision
 from domain.governance_models import AgentActionRequest, AgentIdentity
 from services.governance.approval import ApprovalStore

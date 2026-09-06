@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from domain.enums import RiskLevel
-from domain.governance_enums import ApprovalStatus, GovernanceDecision
+from domain.governance_enums import ApprovalStatus
 from domain.governance_models import ApprovalRequest
 
 
@@ -81,7 +81,7 @@ class ApprovalStore:
     def _expire_if_needed(self, approval: ApprovalRequest) -> None:
         if approval.approval_status != ApprovalStatus.PENDING:
             return
-        age = datetime.now(timezone.utc) - approval.timestamp
+        age = datetime.now(UTC) - approval.timestamp
         if age > self._ttl:
             self._approvals[approval.approval_request_id] = approval.model_copy(
                 update={"approval_status": ApprovalStatus.EXPIRED}
