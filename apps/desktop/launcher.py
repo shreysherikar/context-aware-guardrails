@@ -42,8 +42,24 @@ def _fatal(message: str) -> None:
 def _run_server(port: int) -> None:
     try:
         import uvicorn
+        from starlette.applications import Starlette
+        from starlette.responses import Response
+        from starlette.routing import Route
+        from starlette.staticfiles import StaticFiles
 
-        from apps.api.main import app
+        static_dir = bundle_root() / "apps" / "web"
+
+        def _health(_request):
+            return Response("ok", status_code=200)
+
+        app = Starlette(
+            routes=[
+                Route("/health", _health),
+            ],
+        )
+        app.mount(
+            "/", StaticFiles(directory=str(static_dir), html=True), name="static"
+        )
 
         config = uvicorn.Config(
             app,
@@ -56,7 +72,7 @@ def _run_server(port: int) -> None:
         server.install_signal_handlers = False  # type: ignore[attr-defined]
         server.run()
     except Exception:
-        logger.exception("API server thread crashed")
+        logger.exception("Static file server crashed")
         raise
 
 
