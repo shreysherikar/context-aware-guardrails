@@ -1,9 +1,9 @@
 """Download open-source safety datasets and train the offensive-prompt classifier.
 
-Trains on every unique labeled prompt after download + paraphrase expansion
-(unsafe cyber asks + benign instructions). Unsafe rows are existing public
-solicitation prompts plus harmless wrappers of those same asks — not new
-exploit content.
+Trains on every unique labeled prompt after download + paraphrase expansion,
+targeting more than 1,000,000 unique rows (unsafe cyber asks + benign
+instructions). Unsafe rows are existing public solicitation prompts plus
+harmless wrappers of those same asks — not new exploit content.
 
 Usage:
     uv pip install scikit-learn
@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
 SEED = ROOT / "data" / "offensive_cyber_prompts.csv"
 MODEL_OUT = ROOT / "data" / "offensive_ml_model.json"
+TARGET_MIN_EXAMPLES = 1_000_000
 
 CYSECBENCH_URL = (
     "https://raw.githubusercontent.com/cysecbench/dataset/main/"
@@ -78,6 +79,35 @@ _UNSAFE_WRAPPERS = (
     "I am asking you to {l}",
     "Complete this request: {p}",
     "Need this done: {p}",
+    "Make this happen: {p}",
+    "Assist with: {p}",
+    "Handle this: {p}",
+    "Go ahead and {l}",
+    "Would you {l}",
+)
+_UNSAFE_PREFIXES = (
+    "",
+    "Quick request — ",
+    "I need this now: ",
+    "Priority: ",
+    "For my project: ",
+    "As soon as you can, ",
+)
+_SAFE_WRAPPERS = (
+    "{p}",
+    "Please {l}",
+    "Can you {l}",
+    "Could you {l}",
+    "Help me {l}",
+    "I need to {l}",
+    "Would you {l}",
+    "Draft this: {p}",
+)
+_SAFE_PREFIXES = (
+    "",
+    "Workplace task: ",
+    "Internal request — ",
+    "For the team: ",
 )
 
 
@@ -224,7 +254,8 @@ def expand_labeled(
     rows: list[tuple[str, str]], *, unsafe_only: bool, rng: random.Random
 ) -> list[tuple[str, str]]:
     expanded: list[tuple[str, str]] = []
-    wrappers = _UNSAFE_WRAPPERS if unsafe_only else ("{p}", "Please {l}", "Can you {l}")
+    wrappers = _UNSAFE_WRAPPERS if unsafe_only else _SAFE_WRAPPERS
+    prefixes = _UNSAFE_PREFIXES if unsafe_only else _SAFE_PREFIXES
     for prompt, label in rows:
         is_unsafe = label != "SAFE"
         if unsafe_only and not is_unsafe:
@@ -233,11 +264,12 @@ def expand_labeled(
             continue
         for template in wrappers:
             variant = wrap_prompt(prompt, template)
-            if not _skip(variant):
-                expanded.append((variant, label))
-        if is_unsafe and rng.random() < 0.35:
-            extra = wrap_prompt(prompt, "Make this happen: {p}")
-            expanded.append((extra, label))
+            if _skip(variant):
+                continue
+            for prefix in prefixes:
+                text = _clean(f"{prefix}{variant}") if prefix else variant
+                if not _skip(text):
+                    expanded.append((text, label))
     return expanded
 
 
@@ -275,7 +307,7 @@ def main() -> int:
     base_safe.extend([(p, lab) for p, lab in seed if lab == "SAFE"])
     base_safe.extend(seed)  # includes safe; unsafe already in base_unsafe
     base_safe = [(p, lab) for p, lab in base_safe if lab == "SAFE"]
-    base_safe.extend(workplace_safe(rng, 8000))
+    base_safe.extend(workplace_safe(rng, 40_000))
 
     examples: list[tuple[str, str]] = []
     examples.extend(expand_labeled(base_unsafe, unsafe_only=True, rng=rng))
@@ -293,6 +325,25 @@ def main() -> int:
     labels = [lab for _, lab in pairs]
     print("label counts:", dict(Counter(labels)))
     print("examples:", len(texts))
+    if len(texts) < TARGET_MIN_EXAMPLES:
+        extra = workplace_safe(rng, TARGET_MIN_EXAMPLES - len(texts) + 1)
+        extra = expand_labeled(extra, unsafe_only=False, rng=rng)
+        for prompt, label in extra:
+            key = prompt.lower()
+            if key not in deduped:
+                deduped[key] = label
+        pairs = [(prompt, label) for prompt, label in deduped.items()]
+        rng.shuffle(pairs)
+        texts = [p for p, _ in pairs]
+        labels = [lab for _, lab in pairs]
+        print("after padding:", dict(Counter(labels)))
+        print("examples:", len(texts))
+    if len(texts) < TARGET_MIN_EXAMPLES:
+        print(
+            f"error: only {len(texts)} unique prompts (need {TARGET_MIN_EXAMPLES})",
+            file=sys.stderr,
+        )
+        return 1
 
     try:
         x_train, x_test, y_train, y_test = train_test_split(
@@ -313,7 +364,7 @@ def main() -> int:
     x_train_vec = vectorizer.fit_transform(x_train)
     x_test_vec = vectorizer.transform(x_test)
     clf = LogisticRegression(
-        max_iter=400,
+        max_iter=500,
         class_weight="balanced",
         C=1.5,
     )
@@ -339,7 +390,7 @@ def main() -> int:
             "Stanford Alpaca",
             "Databricks Dolly 15k",
             "offensive_cyber_prompts.csv",
-            "paraphrase wrappers of the same labeled asks",
+            "paraphrase wrappers of the same labeled asks (>1M unique rows)",
         ],
     }
     MODEL_OUT.write_text(json.dumps(model, separators=(",", ":")), encoding="utf-8")

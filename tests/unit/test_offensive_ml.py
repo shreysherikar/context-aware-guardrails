@@ -44,4 +44,4 @@ def test_hackathon_still_allowed_with_ml_layer():
 
 def test_model_trained_on_large_open_source_corpus():
     model = json.loads(_MODEL_PATH.read_text(encoding="utf-8"))
-    assert model["n_examples"] >= 390_000
+    assert model["n_examples"] >= 1_000_000

@@ -11,7 +11,7 @@ exploit payloads, malware binaries, or attack how-tos.
 | [Stanford Alpaca](https://github.com/tatsu-lab/stanford_alpaca) | CC BY-NC 4.0 | Benign instruction prompts (negative class) |
 | [Databricks Dolly 15k](https://huggingface.co/datasets/databricks/databricks-dolly-15k) | CC BY-SA 3.0 | Extra benign instructions |
 | `data/offensive_cyber_prompts.csv` | this repo | Hand-labeled seed (unsafe + safe) |
-| Paraphrase wrappers | this repo | Request-style rewrites of the same labeled asks (full unique set, ~393k rows) |
+| Paraphrase wrappers | this repo | Request-style rewrites of the same labeled asks (full unique set, >1M rows) |
 
 Retrain:
 
