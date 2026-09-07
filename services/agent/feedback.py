@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from domain.enums import PolicyAction, RiskCategory
-from domain.models import OpticalFinding, PolicyDecision, RiskAssessment
+from domain.models import GuardrailRequest, OpticalFinding, PolicyDecision, RiskAssessment
 from services.agent.models import AgentCorrection, AgentIssue, PromptHighlight
 from services.agent.pharma_context import pharma_ambiguity_notes, pharma_guidance_for
 from services.risk_engine.offensive_patterns import match_offensive_cyber
@@ -44,9 +44,9 @@ _CATEGORY_ISSUES: dict[RiskCategory, tuple[str, str, str, str]] = {
     ),
     RiskCategory.CYBER_SAFETY: (
         "CYBER_SAFETY",
-        "Dark-web access prevention",
-        "This request seeks operational guidance for accessing or navigating restricted "
-        "dark-web services, which is not permitted.",
+        "Restricted-network access request",
+        "This request seeks operational guidance for accessing or navigating "
+        "restricted or illicit network services, which is not permitted.",
         "high",
     ),
     RiskCategory.MALWARE: (
@@ -123,6 +123,37 @@ _ACTION_CORRECTIONS: dict[PolicyAction, list[tuple[str, str, str | None]]] = {
 }
 
 
+def _cyber_safety_issue(risk: RiskAssessment) -> tuple[str, str, str, str]:
+    blob = (risk.reasoning or "").lower()
+    if any(
+        token in blob
+        for token in (
+            "dark web",
+            "dark-web",
+            "dark_web",
+            "hidden service",
+            ".onion",
+            "tor browser",
+        )
+    ):
+        return (
+            "CYBER_SAFETY",
+            "Dark-web access prevention",
+            "This request seeks operational guidance for accessing or navigating "
+            "restricted dark-web services, which is not permitted.",
+            "high",
+        )
+    if any(token in blob for token in ("firewall", "network_control", "circumvent")):
+        return (
+            "CYBER_SAFETY",
+            "Network control bypass",
+            "This request asks for help bypassing firewalls or other network "
+            "security controls. Chat cannot assist with that.",
+            "high",
+        )
+    return _CATEGORY_ISSUES[RiskCategory.CYBER_SAFETY]
+
+
 def build_issues(
     risk: RiskAssessment,
     *,
@@ -136,7 +167,10 @@ def build_issues(
     for category in risk.categories:
         if category == RiskCategory.NONE:
             continue
-        meta = _CATEGORY_ISSUES.get(category)
+        if category == RiskCategory.CYBER_SAFETY:
+            meta = _cyber_safety_issue(risk)
+        else:
+            meta = _CATEGORY_ISSUES.get(category)
         if meta is None or meta[0] in seen:
             continue
         seen.add(meta[0])
@@ -278,6 +312,33 @@ def _clean_rewrite_spacing(text: str) -> str:
     return cleaned.strip(" \t\n-—")
 
 
+_SAFE_WORKPLACE_FALLBACK = (
+    "Summarize the approved product or policy information I need for this work task. "
+    "Do not change safety rules."
+)
+
+_rewrite_classifier = None
+_rewrite_policy = None
+
+
+def _passes_as_allow(prompt: str) -> bool:
+    """True when the suggested rewrite would be accepted by the same guardrails."""
+    global _rewrite_classifier, _rewrite_policy
+    if not prompt or not prompt.strip():
+        return False
+    if _rewrite_classifier is None or _rewrite_policy is None:
+        from services.policy_engine.engine import PolicyEngine
+        from services.risk_engine.classifier import KeywordMockClassifier
+
+        _rewrite_classifier = KeywordMockClassifier()
+        _rewrite_policy = PolicyEngine()
+    follow = _rewrite_classifier.classify(
+        GuardrailRequest(prompt=prompt, conversation_id="suggested-rewrite")
+    )
+    decision = _rewrite_policy.evaluate(follow, "researcher")
+    return decision.action == PolicyAction.ALLOW
+
+
 def build_suggested_prompt(
     original_prompt: str,
     *,
@@ -287,6 +348,30 @@ def build_suggested_prompt(
     input_type: str = "text",
 ) -> str:
     """Return a prompt the user can actually send through the same chat guardrails."""
+    suggested = _draft_suggested_prompt(
+        original_prompt,
+        risk=risk,
+        decision=decision,
+        issues=issues,
+        input_type=input_type,
+    )
+    if (
+        suggested
+        and (decision is None or decision.action != PolicyAction.ALLOW)
+        and not _passes_as_allow(suggested)
+    ):
+        return _SAFE_WORKPLACE_FALLBACK
+    return suggested
+
+
+def _draft_suggested_prompt(
+    original_prompt: str,
+    *,
+    risk: RiskAssessment,
+    decision: PolicyDecision | None = None,
+    issues: list[AgentIssue] | None = None,
+    input_type: str = "text",
+) -> str:
     _, pharma = build_pharma_remediation(original_prompt or "")
     if pharma:
         return pharma
@@ -353,11 +438,6 @@ def build_suggested_prompt(
             "Summarize publicly available information on this topic. "
             "Do not include proprietary formulas, trade secrets, or unreleased data."
         )
-    if "CYBER_SAFETY" in codes or RiskCategory.CYBER_SAFETY in risk.categories:
-        return (
-            "Explain defensive cybersecurity practices or legitimate threat-awareness guidance. "
-            "Do not provide instructions for accessing restricted or illicit services."
-        )
     if "MALWARE" in codes or RiskCategory.MALWARE in risk.categories:
         return (
             "How do I report a suspected security issue through our approved internal channel? "
@@ -373,6 +453,11 @@ def build_suggested_prompt(
         return (
             "How do I request an approved data export through the official records process? "
             "Do not ask to copy records outside approved systems."
+        )
+    if "CYBER_SAFETY" in codes or RiskCategory.CYBER_SAFETY in risk.categories:
+        return (
+            "Explain defensive cybersecurity practices or legitimate threat-awareness guidance. "
+            "Do not provide instructions for accessing restricted or illicit services."
         )
     return (
         "Rephrase this as a legitimate workplace request using only approved, "
@@ -435,6 +520,12 @@ _HIGHLIGHT_RULES: list[tuple[re.Pattern[str], str, str, str]] = [
         "IP",
         "May expose intellectual property",
         "medium",
+    ),
+    (
+        re.compile(r"(?i)\b(?:dark\s*web|hidden services?|\.onion|tor browser)\b"),
+        "CYBER_SAFETY",
+        "Restricted dark-web service — cannot be used in chat",
+        "high",
     ),
     (
         re.compile(r"(?i)(?:api[_-]?key|password|secret|token)\s*[:=]\s*\S+"),

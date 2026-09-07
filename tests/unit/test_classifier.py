@@ -80,3 +80,9 @@ def test_hack_together_prototype_is_not_hacking():
     r = classifier.classify(_req("Let's hack together a prototype for the town hall."))
     assert RiskCategory.MALWARE not in r.categories
     assert r.risk_level == RiskLevel.LOW
+
+
+def test_confidential_vendor_upload_is_not_dark_web():
+    r = classifier.classify(_req("Upload this confidential file to the external vendor portal."))
+    assert RiskCategory.CYBER_SAFETY not in r.categories
+    assert r.risk_level == RiskLevel.LOW

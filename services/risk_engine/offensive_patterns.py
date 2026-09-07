@@ -73,7 +73,7 @@ _HACKING: list[str] = [
         r"trojan|ransomware|spyware)\b"
     ),
     r"\b(?:ransomware|keylogger) (?:payload|encrypt|builder|note)\b",
-    r"\bkeylog(?:ging)?\b",
+    r"\bkeylog\b",
     r"\breverse ?shell\b",
     r"\bbind ?shell\b",
     r"\b(?:web ?shell|drop (?:a )?(?:web)?shell)\b",
@@ -105,6 +105,7 @@ _HACKING: list[str] = [
         r"this |the )?(?:account|email|system|server|wifi|computer|phone)\b"
     ),
     r"\bbypass (?:the )?(?:authentication|login|password|mfa|2fa|access control)\b",
+    r"\bbypass .{0,40}\b(?:firewall|network (?:restriction|control)s?)\b",
     r"\bgain unauthorized access\b",
     r"\b(?:launch|perform|run) (?:a )?(?:ddos|dos) attack\b",
     r"\bhow (?:do i |to )?ddos\b",
@@ -137,6 +138,10 @@ _EXFIL: list[str] = [
     (
         r"\bsend (?:all |the )?(?:data|files|records) "
         r"(?:externally|to (?:external|unknown|unauthorized))\b"
+    ),
+    (
+        r"\bsend .{0,40}(?:patient records|medical records)\b.{0,30}"
+        r"(?:externally|outside)\b"
     ),
     (
         r"\bupload all (?:data|files|records) "

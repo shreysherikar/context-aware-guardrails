@@ -19,7 +19,8 @@ _MODEL_PATH = Path(__file__).resolve().parents[2] / "data" / "offensive_ml_model
 _TOKEN_RE = re.compile(r"(?u)\b\w\w+\b")
 _EDU_ALLOW = re.compile(
     r"(?i)\b(what is|overview of|how (do we|to) detect|awareness training|"
-    r"owasp top|report a (security|suspicious)|password manager)\b"
+    r"owasp top|report a (security|suspicious)|password manager|"
+    r"approved (?:internal )?channel|defensive cyber)\b"
 )
 _CATEGORY = {
     "MALWARE": RiskCategory.MALWARE,

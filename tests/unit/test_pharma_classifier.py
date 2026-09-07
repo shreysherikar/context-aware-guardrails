@@ -42,3 +42,19 @@ def test_disguised_evidence_prompt_is_critical():
     )
     assert result.risk_level.value == "CRITICAL"
     assert result.injection_detected is True
+
+
+def test_safe_segmentation_rewrite_is_not_phi():
+    clf = get_classifier()
+    result = clf.classify(
+        GuardrailRequest(
+            prompt=(
+                "Propose segmentation rules based on non-sensitive, consented attributes "
+                "(specialty, geography) and clearly state assumptions. "
+                "No inference about individual people."
+            ),
+            conversation_id="t",
+        )
+    )
+    assert result.risk_level.value == "LOW"
+    assert result.categories[0].value == "NONE"
