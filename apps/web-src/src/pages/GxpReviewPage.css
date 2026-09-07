@@ -443,6 +443,20 @@
   color: var(--text-muted);
 }
 
+.gxp-rewrite-verify {
+  margin: 0 0 0.75rem;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.gxp-rewrite-verify.ok {
+  color: var(--ok-fg, #059669);
+}
+
+.gxp-rewrite-verify.warn {
+  color: var(--warn-fg, #b45309);
+}
+
 .rewrite-action--rewrite,
 .rewrite-action--clarify {
   color: #e65100;

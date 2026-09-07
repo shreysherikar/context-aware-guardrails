@@ -51,6 +51,8 @@ export function apiUrl(path) {
   // Desktop window and phone URL are same-origin with the API — do not send
   // those calls to the production VITE_API_BASE_URL.
   if (servedFromLocalApi()) return normalized;
+  const override = getApiBase();
+  if (override) return `${override}${normalized}`;
   const envBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
   return envBase ? `${envBase}${normalized}` : normalized;
 }

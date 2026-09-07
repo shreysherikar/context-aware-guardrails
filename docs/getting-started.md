@@ -41,8 +41,10 @@ The relevant knobs:
 - `POLICY_PATH`, `AUDIT_DB_PATH` — override the policy file and audit database
   locations.
 - `OPTICAL_OCR_PROVIDER` — OCR for `POST /guardrail/evaluate-image`. Default
-  `mock` (offline). Set `tesseract` for local Tesseract (`uv sync --extra
-  optical-tesseract` plus a system Tesseract binary).
+  `mock` (offline). Keep `mock` on ECS. Set `tesseract` only with a local
+  Tesseract binary. `ollama` with a loopback `OLLAMA_BASE_URL` falls back to mock.
+- `TRAJECTORY_ESCALATE` — Prompt Lab multi-turn review. Set `false` for live
+  canned-example demos so a risky turn does not poison the next prompt.
 - `OPTICAL_MAX_IMAGE_BYTES` — max upload size (default 10485760 = 10 MB).
 
 `LLM_PROVIDER=mock` is the safe default for getting the server up without

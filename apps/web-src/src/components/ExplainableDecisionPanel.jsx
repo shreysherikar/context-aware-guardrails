@@ -5,6 +5,7 @@ import ResolutionActions from './ResolutionActions';
 const DECISION_HEADINGS = {
   ALLOW: { icon: '✓', title: 'Request Allowed' },
   REWRITE: { icon: '⚠️', title: 'Prompt Safely Rewritten' },
+  CLARIFY: { icon: '❓', title: 'Clarification Needed' },
   BLOCK: { icon: '🛑', title: 'Prompt Not Forwarded' },
   REVIEW: { icon: '🔎', title: 'Human Review Required' },
 };
@@ -45,6 +46,12 @@ export default function ExplainableDecisionPanel({
       {decision === 'REWRITE' && (
         <>
           <p className="explain-lead">{explanation.reason}</p>
+          {typeof data?.rewrite_verified === 'boolean' && (
+            <p className={`explain-note ${data.rewrite_verified ? '' : 'warn'}`}>
+              Rewrite re-check: {data.rewrite_verified ? 'verified' : 'not verified'}
+              {data.rewrite_rationale ? ` — ${data.rewrite_rationale}` : ''}
+            </p>
+          )}
           {explanation.sanitized_prompt && (
             <div className="box">
               <p className="kv-label">Safe version forwarded to LLM</p>
@@ -54,6 +61,15 @@ export default function ExplainableDecisionPanel({
           {explanation.original_prompt_protected && (
             <p className="muted explain-note">Original prompt is protected and was not forwarded.</p>
           )}
+        </>
+      )}
+
+      {decision === 'CLARIFY' && (
+        <>
+          <p className="explain-lead">{explanation.reason}</p>
+          <p className="explain-note">
+            Chat will not generate until the request is scoped to approved, on-label materials.
+          </p>
         </>
       )}
 
