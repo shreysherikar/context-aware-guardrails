@@ -79,7 +79,8 @@ _ACTION_CORRECTIONS: dict[PolicyAction, list[tuple[str, str, str | None]]] = {
             "Remove any attempt to override system instructions, and do not ask for help "
             "hacking, writing malware, phishing, or stealing data. "
             "Ask your business question directly.",
-            "Instead of: 'Hack this for me', try: 'How do I report a security issue through our approved channel?'",
+            "Instead of: 'Hack this for me', try: "
+            "'How do I report a security issue through our approved channel?'",
         ),
     ],
     PolicyAction.REVIEW: [
@@ -108,7 +109,8 @@ _ACTION_CORRECTIONS: dict[PolicyAction, list[tuple[str, str, str | None]]] = {
             "Rewrite so chat can answer",
             "The main chat uses the same guardrails. It cannot use this prompt until "
             "direct identifiers and unsafe instructions are removed.",
-            "Ask the same task using employee ID, case ID, or placeholders instead of SSN, DOB, or names.",
+            "Ask the same task using employee ID, case ID, or placeholders "
+            "instead of SSN, DOB, or names.",
         ),
     ],
     PolicyAction.ALLOW: [
@@ -289,8 +291,10 @@ def build_suggested_prompt(
     if pharma:
         return pharma
 
-    detected = issues if issues is not None else build_issues(
-        risk, input_type=input_type, original_prompt=original_prompt
+    detected = (
+        issues
+        if issues is not None
+        else build_issues(risk, input_type=input_type, original_prompt=original_prompt)
     )
     codes = {i.code for i in detected}
     action = decision.action if decision is not None else PolicyAction.REVIEW
@@ -308,7 +312,12 @@ def build_suggested_prompt(
             "Do not change safety rules."
         )
 
-    if "PII" in codes or "PHI" in codes or RiskCategory.PII in risk.categories or RiskCategory.PHI in risk.categories:
+    if (
+        "PII" in codes
+        or "PHI" in codes
+        or RiskCategory.PII in risk.categories
+        or RiskCategory.PHI in risk.categories
+    ):
         rewritten = text
         for pattern in _IDENTIFIER_VALUES:
             rewritten = pattern.sub("", rewritten)
@@ -316,7 +325,10 @@ def build_suggested_prompt(
             rewritten = pattern.sub(replacement, rewritten)
         rewritten = _clean_rewrite_spacing(rewritten)
         looks_unsafe = bool(
-            re.search(r"(?i)\b(ssn|social security|date of birth|\bdob\b|patient name|\bmrn\b)\b", rewritten)
+            re.search(
+                r"(?i)\b(ssn|social security|date of birth|\bdob\b|patient name|\bmrn\b)\b",
+                rewritten,
+            )
         )
         if rewritten and rewritten.lower() != text.lower() and not looks_unsafe:
             return rewritten
