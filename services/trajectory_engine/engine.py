@@ -16,6 +16,7 @@ reason, exactly like OpticalAssessment), and only the PolicyEngine decides.
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Sequence
 
 from domain.enums import RiskCategory, RiskLevel
@@ -28,6 +29,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_WINDOW_LIMIT = 10
 # Trajectory escalates once this many turns in the window sit at MEDIUM+.
 MIN_MEDIUM_OR_ABOVE_TURNS = 2
+
+
+def trajectory_escalate_enabled() -> bool:
+    """Demo-night escape hatch: TRAJECTORY_ESCALATE=false skips TRAJECTORY-001."""
+    raw = os.getenv("TRAJECTORY_ESCALATE", "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
 
 _RISK_RANK = {
     RiskLevel.LOW: 0,
@@ -121,6 +129,12 @@ def evaluate_conversation(
     single-turn policy. This ensures the fail-closed principle applies across
     all authoritative gates, not just the primary policy engine.
     """
+    if not trajectory_escalate_enabled():
+        return TrajectoryAssessment(
+            escalate=False,
+            reason="trajectory escalation disabled (TRAJECTORY_ESCALATE=false)",
+        )
+
     try:
         prior_events = get_recent_events(conversation_id, limit=window_limit)
     except Exception:  # noqa: BLE001 - deliberate fail-closed with logged warning

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiFetch } from '../api';
+import { apiFetch, getApiBase, setApiBase } from '../api';
 import { Sun, Moon } from 'lucide-react';
 import LoginBrandPanel from '../components/login/LoginBrandPanel';
 import LoginPanelDecor from '../components/login/LoginPanelDecor';
@@ -24,7 +24,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [devMode, setDevMode] = useState(true);
+  const [demoRole, setDemoRole] = useState('researcher');
+  const [serverUrl, setServerUrl] = useState(
+    () => getApiBase() || (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, ''),
+  );
   const googleButtonRef = useRef(null);
+  const isNative =
+    typeof window !== 'undefined' &&
+    typeof window.Capacitor?.isNativePlatform === 'function' &&
+    window.Capacitor.isNativePlatform();
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/demo/config')
+      .then((cfg) => {
+        if (cancelled || typeof cfg?.auth_dev_mode !== 'boolean') return;
+        setDevMode(cfg.auth_dev_mode);
+      })
+      .catch(() => {
+        if (!cancelled) setDevMode(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverUrl]);
 
   async function signInWith(nextEmail, nextPassword) {
     const trimmedEmail = (nextEmail || '').trim();
@@ -32,6 +56,7 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
+      if (serverUrl.trim()) setApiBase(serverUrl);
       const data = await apiFetch('/auth/login', {
         method: 'POST',
         body: { email: trimmedEmail, password: nextPassword },
@@ -57,7 +82,29 @@ export default function LoginPage() {
   async function handleDemo() {
     setEmail(DEMO_EMAIL);
     setPassword(DEMO_PASSWORD);
-    await signInWith(DEMO_EMAIL, DEMO_PASSWORD);
+    try {
+      await signInWith(DEMO_EMAIL, DEMO_PASSWORD);
+    } catch {
+      /* signInWith already set error */
+    }
+  }
+
+  async function handleStartSession() {
+    setLoading(true);
+    setError(null);
+    try {
+      if (serverUrl.trim()) setApiBase(serverUrl);
+      const data = await apiFetch('/auth/dev-token', {
+        method: 'POST',
+        body: { role: demoRole },
+      });
+      if (!data?.token) throw { status: 0, message: 'No token in response.', type: 'server' };
+      login(data.token, data.role || demoRole);
+    } catch (err) {
+      setError(err.message || 'Could not start a demo session. AUTH_DEV_MODE may be off.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -155,6 +202,21 @@ export default function LoginPage() {
           <span className="login-form-rule" aria-hidden="true" />
 
           <form className="login-form" onSubmit={handleSubmit}>
+            {isNative && (
+              <div className="login-field">
+                <label htmlFor="login-server">API server (phone / APK)</label>
+                <input
+                  id="login-server"
+                  type="url"
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                  onBlur={() => setApiBase(serverUrl)}
+                  placeholder="https://your-ecs-api.example"
+                  autoComplete="url"
+                  spellCheck="false"
+                />
+              </div>
+            )}
             <div className="login-field">
               <label htmlFor="login-email">Email</label>
               <input
@@ -199,6 +261,36 @@ export default function LoginPage() {
             >
               Sign in as demo
             </button>
+            {devMode && (
+              <>
+                <div className="login-field">
+                  <label htmlFor="login-role">Hackathon session role</label>
+                  <select
+                    id="login-role"
+                    className="login-select"
+                    value={demoRole}
+                    onChange={(e) => setDemoRole(e.target.value)}
+                    disabled={loading}
+                  >
+                    <option value="researcher">researcher</option>
+                    <option value="clinician">clinician</option>
+                    <option value="marketing">marketing</option>
+                    <option value="employee">employee</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="login-submit"
+                  onClick={handleStartSession}
+                  disabled={loading}
+                >
+                  {loading ? 'Starting…' : 'Start session'}
+                </button>
+                <p className="login-footnote">
+                  Start session mints a demo token via <code>/auth/dev-token</code> (hackathon only).
+                </p>
+              </>
+            )}
           </form>
 
           {GOOGLE_CLIENT_ID ? (

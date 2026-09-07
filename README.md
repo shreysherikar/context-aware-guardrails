@@ -14,8 +14,9 @@ The app talks to your local **Llama** through Ollama (`llama3.2:3b`). Keep
 
 Install **app-debug.apk** from the same Releases page (Android sideload), or open
 the **phone URL** from the desktop window title on the same Wi-Fi and choose
-**Add to Home Screen**. Sign in with email and password (local demo:
-`clinician@contextguard.local` / `clinician`) or Google.
+**Add to Home Screen**. Sign in with **Start session**, dummy accounts
+(`clinician@contextguard.local` / `clinician` or `demo@contextguard.local` /
+`demo`), or Google.
 
 Optional: place a `.env` file next to the exe to override the model or switch
 providers. Logs and the audit database live in `%LOCALAPPDATA%\ContextGuard`.
@@ -24,11 +25,11 @@ From source: `uv sync --extra desktop` then `uv run python -m apps.desktop`.
 
 ## Live demo
 
-Open the hosted demo (no clone or install needed): **<https://YOUR-DEPLOYED-URL.onrender.com>** —
-pick a role, click **Start session**, then send a prompt or one of the five example
-buttons. Deployment is the Dockerfile at the repo root via [`render.yaml`](render.yaml)
-(deployment config only — no secrets are committed; the env vars are set by name in
-the Render dashboard, listed in that file's header).
+Open **https://d3ozo8x5pyta7s.cloudfront.net/** (no clone needed). Click **Start session** (hackathon token) or sign in with `demo@contextguard.local` / `demo`, then use **Prompt Lab** for the five canned examples.
+
+API: **https://co-384d94ac3210447c92a6e4e333428cbf.ecs.ap-south-1.on.aws** — `GET /health` → `{"status":"ok"}`.
+
+Full judge script, ECS env checklist, and curl examples: [docs/demo-runbook.md](docs/demo-runbook.md).
 
 ## Quickstart for judges
 
@@ -58,8 +59,9 @@ uv run uvicorn apps.api.main:app
 ```
 
 Open **http://localhost:8000** → pick a role, click **Start session**, then send a
-prompt — or click one of the five example buttons, one per policy outcome
-(ALLOW / REWRITE / CLARIFY / REVIEW / BLOCK).
+prompt — or open **Prompt Lab** and click one of the five example buttons, one per
+policy outcome (ALLOW / REWRITE / CLARIFY / REVIEW / BLOCK). Each Prompt Lab check
+starts a new conversation id.
 
 **No API key? You're still good.** The default `LLM_PROVIDER=mock` config runs
 fully offline, so every policy decision works; ALLOW/REWRITE just return a null
@@ -86,7 +88,7 @@ enforcement in front of internal AI assistants.
 ## Documentation
 
 - [Architecture](docs/architecture.md) — current implementation and target architecture
-- [Getting Started](docs/getting-started.md) — local setup and where new code goes
+- [Demo runbook](docs/demo-runbook.md) — live URLs, ECS env vars, five judge prompts
 - [Engineering](docs/engineering.md) — developer conventions and workflow
 - [Security](docs/security.md) — security posture and limitations
 - [Decisions](docs/decisions.md) — architecture decision records

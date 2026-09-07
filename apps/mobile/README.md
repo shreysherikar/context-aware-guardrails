@@ -21,4 +21,15 @@ cd android && ./gradlew assembleDebug
 ```
 
 Install `android/app/build/outputs/apk/debug/app-debug.apk` on the phone.
-Sign in with email and password, or Google.
+
+Sign-in:
+
+- **Start session** (hackathon) if the API has `AUTH_DEV_MODE=true`
+- Dummy accounts: `demo@contextguard.local` / `demo`, or `clinician@contextguard.local` / `clinician`
+- Google, if configured
+
+On the APK, set **API server** on the login screen if the bundled host is wrong. Production API:
+
+`https://co-384d94ac3210447c92a6e4e333428cbf.ecs.ap-south-1.on.aws`
+
+CloudFront UI (same backend): https://d3ozo8x5pyta7s.cloudfront.net/

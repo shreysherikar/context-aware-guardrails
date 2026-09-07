@@ -89,7 +89,8 @@ _PHARMA_GUIDANCE: list[tuple[str, PharmaGuidance]] = [
             ],
             suggested_rewrite=(
                 "Propose segmentation rules based on non-sensitive, consented attributes "
-                "(specialty, geography) and clearly state assumptions. No patient-level inference."
+                "(specialty, geography) and clearly state assumptions. "
+                "No inference about individual people."
             ),
         ),
     ),

@@ -21,7 +21,7 @@
   justify-content: flex-end;
   align-items: center;
   flex-shrink: 0;
-  padding: 0.875rem 1.25rem;
+  padding: calc(0.875rem + env(safe-area-inset-top)) calc(1.25rem + env(safe-area-inset-right)) 0.875rem 1.25rem;
   pointer-events: none;
 }
 
@@ -256,7 +256,7 @@
   left: 50%;
   bottom: 0;
   transform: translateX(-50%);
-  padding-bottom: 2rem;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
 }
 
 .home-composer {
@@ -695,8 +695,16 @@
     padding: 3.25rem 1rem 0.75rem;
   }
 
+  .home-landing {
+    padding: 5.5rem 1rem calc(7.5rem + env(safe-area-inset-bottom));
+  }
+
   .home-composer-dock {
-    padding: 0 1rem 1rem;
+    padding: 0 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  .home-page:not(.home-page--chat) .home-composer-dock {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
   }
 
   .home-chat-bubble {

@@ -68,8 +68,8 @@ function cannotUseWhy(result) {
 }
 
 function mustRewriteWhy(result) {
-  const first = (result.issues || [])[0];
-  const focus = first?.title ? first.title.toLowerCase() : 'the flagged content';
+  const titles = (result.issues || []).map((issue) => issue.title).filter(Boolean);
+  const focus = titles.length ? titles.join(', ').toLowerCase() : 'the flagged content';
   return (
     `The rewrite keeps your intent but removes ${focus}, so the same chat guardrails can accept it.`
   );
@@ -87,6 +87,8 @@ function resultFromChat(data, originalText) {
     issues: data.issues || [],
     corrections: data.corrections || [],
     highlights: data.highlights || [],
+    rewrite_verified: data.rewrite_verified,
+    rewrite_rationale: data.rewrite_rationale,
     summary: flagged
       ? `This prompt cannot be used as written${firstIssue?.title ? ` — ${firstIssue.title}` : '.'}`
       : 'This prompt can already be used in chat.',
@@ -191,12 +193,12 @@ export default function GxpReviewPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function useRewritten() {
-    if (result?.rewritten_text) {
-      setText(result.rewritten_text);
-      setResult(null);
-      setActiveFlaggedKey(null);
-    }
+  async function useRewritten() {
+    const next = (result?.rewritten_text || '').trim();
+    if (!next) return;
+    setText(next);
+    setActiveFlaggedKey(null);
+    await checkPrompt(next);
   }
 
   return (
@@ -326,6 +328,13 @@ export default function GxpReviewPage() {
               </div>
             </section>
           </div>
+
+          {typeof result.rewrite_verified === 'boolean' && (
+            <p className={`gxp-rewrite-verify ${result.rewrite_verified ? 'ok' : 'warn'}`}>
+              Rewrite re-check: {result.rewrite_verified ? 'verified' : 'not verified'}
+              {result.rewrite_rationale ? ` — ${result.rewrite_rationale}` : ''}
+            </p>
+          )}
 
           {result.flagged && (
             <section className="gxp-findings-card">

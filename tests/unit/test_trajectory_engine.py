@@ -171,6 +171,13 @@ def test_history_lookup_failure_fails_closed(monkeypatch):
     assert "failed" in result.reason.lower()
 
 
+def test_trajectory_can_be_disabled_for_demo(monkeypatch):
+    monkeypatch.setenv("TRAJECTORY_ESCALATE", "false")
+    result = evaluate_conversation("demo-conv", _ra(RiskLevel.HIGH))
+    assert result.escalate is False
+    assert "disabled" in result.reason.lower()
+
+
 # --- structural constraint: evidence only, never a decision --------------------
 
 

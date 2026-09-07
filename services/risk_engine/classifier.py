@@ -15,7 +15,7 @@ import re
 
 from domain.enums import DataSensitivity, RiskCategory, RiskLevel
 from domain.models import GuardrailRequest, RiskAssessment
-from services.cyber_safety.darkweb import assess_darkweb_content
+from services.cyber_safety.darkweb import assess_darkweb_content, is_network_bypass_only
 from services.risk_engine.offensive_ml import predict_offensive_category
 from services.risk_engine.offensive_patterns import offensive_categories
 from services.risk_engine.pharma_patterns import has_safe_pharma_signals, match_pharma_patterns
@@ -75,7 +75,7 @@ class KeywordMockClassifier(RiskClassifier):
         r"patient name",
         r"adverse reaction",
         r"medical record number",
-        r"patient[- ]level",
+        r"(?<!\bno )(?<!\bwithout )patient[- ]level (?:data|records|targeting|insights)",
         r"identifiable patient",
         r"patient specifics",
         r"what the patient might be experiencing",
@@ -134,18 +134,30 @@ class KeywordMockClassifier(RiskClassifier):
         darkweb = assess_darkweb_content(request.prompt, is_output=False)
         darkweb_level: RiskLevel | None = None
         if darkweb.decision != "ALLOW":
-            if RiskCategory.CYBER_SAFETY not in categories:
-                categories.append(RiskCategory.CYBER_SAFETY)
-            pharma_reasons.extend(darkweb.reasons)
-            darkweb_level = darkweb.risk_level
-            if darkweb.injection_attempt:
+            if is_network_bypass_only(darkweb):
+                if RiskCategory.MALWARE not in categories:
+                    categories.append(RiskCategory.MALWARE)
+                pharma_reasons.extend(darkweb.reasons)
+            else:
+                if RiskCategory.CYBER_SAFETY not in categories:
+                    categories.append(RiskCategory.CYBER_SAFETY)
+                pharma_reasons.extend(darkweb.reasons)
+                darkweb_level = darkweb.risk_level
+            if darkweb.injection_attempt and darkweb_level is not None:
                 injection = True
                 if RiskCategory.PROMPT_INJECTION not in categories:
                     categories.append(RiskCategory.PROMPT_INJECTION)
 
         # Well-scoped safe prompts from the dataset reduce false positives.
         if has_safe_pharma_signals(text) and not injection:
-            categories = [c for c in categories if c not in (RiskCategory.OFF_LABEL,)]
+            drop = {RiskCategory.OFF_LABEL}
+            if re.search(
+                r"(?i)(?:do not include individual|non[- ]identifying|"
+                r"no inference about individual)",
+                text,
+            ):
+                drop.add(RiskCategory.PHI)
+            categories = [c for c in categories if c not in drop]
 
         if injection:
             level = RiskLevel.CRITICAL

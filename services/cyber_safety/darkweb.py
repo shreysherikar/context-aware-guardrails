@@ -59,10 +59,36 @@ _EDUCATIONAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?i)\bused by some organizations\b"), "general_context"),
 ]
 
+# Workplace reporting / awareness. These mention "access" only as something to
+# refuse (e.g. "do not ask for unauthorized access") and must not be scored as
+# dark-web navigation.
+_SAFE_WORKPLACE_CYBER = [
+    re.compile(r"(?i)\breport a (?:suspected )?(?:security|cyber) issue\b"),
+    re.compile(r"(?i)\bapproved (?:internal )?channel\b"),
+    re.compile(r"(?i)\bvulnerability disclosure\b"),
+    re.compile(r"(?i)\bdo not ask for exploit\b"),
+    re.compile(r"(?i)\bdo not (?:ask for|provide)\b.{0,80}\bunauthorized access\b"),
+]
+
+# Operational patterns that are only dark-web when the prompt is actually about
+# dark web / Tor / hidden services. Generic "how do I … access" matches
+# "unauthorized access" in safe rewrites and must not fire alone.
+_TOPIC_REQUIRED_CATEGORIES = {
+    "dark_web_access",
+    "dark_web_navigation",
+    "dark_web_search",
+    "anonymous_access_guidance",
+    "proxy_evasion",
+    "hidden_service_access",
+}
+
 # --- Operational / access-enabling (increases actionability) ---
 _OPERATIONAL_PATTERNS: list[tuple[re.Pattern[str], str, RiskLevel]] = [
     (
-        re.compile(r"(?i)\bhow (?:do|can) i\b.*\b(?:access|reach|get to|navigate|browse)\b"),
+        re.compile(
+            r"(?i)\bhow (?:do|can) i\b.{0,80}\b(?:access|reach|get to|navigate|browse)\b"
+            r".{0,80}\b(?:dark\s*web|hidden service|\.onion|tor browser)\b"
+        ),
         "dark_web_access",
         RiskLevel.HIGH,
     ),
@@ -71,10 +97,15 @@ _OPERATIONAL_PATTERNS: list[tuple[re.Pattern[str], str, RiskLevel]] = [
         "dark_web_access",
         RiskLevel.HIGH,
     ),
-    (re.compile(r"(?i)\bhow to access\b"), "dark_web_access", RiskLevel.HIGH),
     (re.compile(r"(?i)\bto access the dark web\b"), "dark_web_access", RiskLevel.HIGH),
     (re.compile(r"(?i)\bmost common way to access\b.*\bdark\b"), "dark_web_access", RiskLevel.HIGH),
-    (re.compile(r"(?i)\bstep[s-]?by[- ]?step\b"), "dark_web_navigation", RiskLevel.HIGH),
+    (
+        re.compile(
+            r"(?i)\bstep[s-]?by[- ]?step\b.{0,80}\b(?:dark\s*web|tor|hidden service|\.onion)\b"
+        ),
+        "dark_web_navigation",
+        RiskLevel.HIGH,
+    ),
     (
         re.compile(r"(?i)\binstructions? for\b.*\b(?:finding|accessing|navigating)\b"),
         "dark_web_navigation",
@@ -214,8 +245,25 @@ _OPERATIONAL_SENTENCE = re.compile(
 )
 
 
+_NETWORK_BYPASS_ONLY = {"network_control_bypass", "security_control_evasion"}
+_EDUCATIONAL_CATS = {
+    "educational_definition",
+    "educational_comparison",
+    "educational_context",
+    "defensive_risk_analysis",
+    "defensive",
+    "general_context",
+}
+
+
 def _has_topic(text: str) -> bool:
     return any(p.search(text) for p in _TOPIC_PATTERNS)
+
+
+def is_network_bypass_only(assessment: DarkWebAssessment) -> bool:
+    """Firewall/network-control bypass without dark-web topic is hacking, not dark web."""
+    ops = {c for c in assessment.categories if c not in _EDUCATIONAL_CATS}
+    return bool(ops) and ops <= _NETWORK_BYPASS_ONLY
 
 
 def _evidence_hash(text: str) -> str:
@@ -232,6 +280,15 @@ def assess_darkweb_content(
     """Classify content by topic, intent, actionability, and harm potential."""
     if not text or not text.strip():
         return DarkWebAssessment(decision="ALLOW", educational=True, confidence=1.0)
+
+    if any(p.search(text) for p in _SAFE_WORKPLACE_CYBER) and not _has_topic(text):
+        return DarkWebAssessment(
+            risk_level=RiskLevel.LOW,
+            decision="ALLOW",
+            educational=True,
+            reasons=["Workplace security reporting or awareness request"],
+            confidence=0.95,
+        )
 
     categories: list[str] = []
     reasons: list[str] = []
@@ -261,10 +318,9 @@ def assess_darkweb_content(
     has_restricted_dest = bool(
         re.search(r"(?i)\b(?:dark[- ]?web|hidden service|\.onion|illicit marketplace)\b", text)
     )
-    if has_exfil_data and (
-        has_restricted_dest
-        or re.search(r"(?i)\b(?:upload|send|exfiltrat|transfer)\b.*\b(?:external|outside)\b", text)
-    ):
+    # Only dark-web destinations belong here. "Send a confidential report to
+    # external legal counsel" is ordinary workplace routing, not dark-web exfil.
+    if has_exfil_data and has_restricted_dest:
         data_exfil = True
         categories.append("DARKWEB_DATA_EXFILTRATION")
         reasons.append("Sensitive data transfer to restricted network destination")
@@ -294,15 +350,18 @@ def assess_darkweb_content(
 
     # Operational patterns
     for pattern, cat, pattern_risk in _OPERATIONAL_PATTERNS:
-        if pattern.search(text):
-            actionable = True
-            if cat not in categories:
-                categories.append(cat)
-            reasons.append(f"Operational access-enabling content detected ({cat})")
-            if _RISK_ORDER(pattern_risk) > _RISK_ORDER(risk):
-                risk = pattern_risk
-            if not security_event:
-                security_event = _category_to_event(cat)
+        if not pattern.search(text):
+            continue
+        if cat in _TOPIC_REQUIRED_CATEGORIES and not _has_topic(text):
+            continue
+        actionable = True
+        if cat not in categories:
+            categories.append(cat)
+        reasons.append(f"Operational access-enabling content detected ({cat})")
+        if _RISK_ORDER(pattern_risk) > _RISK_ORDER(risk):
+            risk = pattern_risk
+        if not security_event:
+            security_event = _category_to_event(cat)
 
     if is_output:
         for pattern, cat in _OUTPUT_OPERATIONAL:
@@ -367,8 +426,16 @@ def assess_darkweb_content(
     else:
         decision = "ALLOW"
 
-    # Input access requests without explicit educational framing
-    if not is_output and re.search(r"(?i)\bhow (?:do|can) i\b", text) and _has_topic(text):
+    # Input access requests about the dark web itself (not "how do I report…")
+    if (
+        not is_output
+        and _has_topic(text)
+        and not educational
+        and re.search(
+            r"(?i)\bhow (?:do|can) i\b.{0,80}\b(?:access|reach|navigate|browse|install|download)\b",
+            text,
+        )
+    ):
         decision = "BLOCK"
         if _RISK_ORDER(RiskLevel.HIGH) > _RISK_ORDER(risk):
             risk = RiskLevel.HIGH

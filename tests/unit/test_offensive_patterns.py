@@ -65,3 +65,14 @@ def test_training_safe_prompts_are_not_offensive(row: dict[str, str]):
 def test_held_out_paraphrases_still_match(prompt: str, category: RiskCategory):
     result = classifier.classify(_req(prompt))
     assert category in result.categories, prompt
+
+
+def test_educational_keylogging_is_allowed():
+    for prompt in (
+        "What is keylogging?",
+        "Draft security awareness training about keylogging.",
+    ):
+        assert not offensive_categories(prompt), prompt
+        result = classifier.classify(_req(prompt))
+        assert RiskCategory.MALWARE not in result.categories, prompt
+        assert result.risk_level == RiskLevel.LOW

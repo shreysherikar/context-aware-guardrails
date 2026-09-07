@@ -38,11 +38,13 @@ export function setApiBase(base) {
 
 export function apiUrl(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
+  const override = getApiBase();
+  if (override) return `${override}${normalized}`;
   // Always target the configured backend (VITE_API_BASE_URL) when set. The
   // desktop shell serves this UI from 127.0.0.1 with no API behind it, so
   // same-origin relative URLs would hit the static server and return 405.
   // CloudFront, Capacitor/Android, and the Vite dev proxy all resolve through
-  // the same rule.
+  // the same rule. APK users can still override via the login API server field.
   const envBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
   return envBase ? `${envBase}${normalized}` : normalized;
 }

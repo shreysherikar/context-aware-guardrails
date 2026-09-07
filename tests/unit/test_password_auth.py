@@ -46,6 +46,13 @@ def test_dummy_account_works_in_dev_mode(monkeypatch):
     assert identity.role == "clinician"
 
 
+def test_dev_mode_unlocks_desktop_demo_users(monkeypatch):
+    monkeypatch.setenv("AUTH_PASSWORD_USERS", "")
+    monkeypatch.setenv("AUTH_DEV_MODE", "true")
+    identity = authenticate_password("clinician@contextguard.local", "clinician")
+    assert identity.role == "clinician"
+
+
 def test_dummy_account_works_when_flag_set(monkeypatch):
     monkeypatch.setenv("AUTH_PASSWORD_USERS", "")
     monkeypatch.setenv("AUTH_DEV_MODE", "false")
