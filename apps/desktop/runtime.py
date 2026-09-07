@@ -1,4 +1,4 @@
-"""Configure environment and wait for the local API before opening a window."""
+"""Configure environment for the desktop shell before opening a window."""
 
 from __future__ import annotations
 
@@ -55,6 +55,7 @@ def configure_desktop_environment() -> Path:
     _set_if_blank("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     _set_if_blank("OLLAMA_TIMEOUT", "600")
     os.environ["SERVE_STATIC_FRONTEND"] = "true"
+
     desktop_origins = [
         "https://localhost",
         "http://localhost",
@@ -73,6 +74,7 @@ def configure_desktop_environment() -> Path:
         if origin not in merged:
             merged.append(origin)
     os.environ["ALLOWED_ORIGINS"] = ",".join(merged)
+
     return data_dir
 
 

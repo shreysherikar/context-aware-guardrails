@@ -2,9 +2,10 @@
  * Centralized API client.
  *
  * Attaches Authorization: Bearer <token> when present, centralizes base URL
- * (VITE_API_BASE_URL when this UI is hosted separately, otherwise same-origin;
- * proxied in dev via vite.config), and normalizes error handling into a
- * consistent shape components can render.
+ * (VITE_API_BASE_URL when set -- production CloudFront, the desktop shell, and
+ * Capacitor/Android; otherwise same-origin relative paths proxied in dev via
+ * vite.config), and normalizes error handling into a consistent shape
+ * components can render.
  */
 
 /**
@@ -16,17 +17,6 @@
  */
 
 const STORAGE_KEY = 'contextguard-api-base';
-
-function servedFromLocalApi() {
-  if (typeof window === 'undefined') return false;
-  // Capacitor loads the UI from https://localhost; that is not the API.
-  if (typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
-    return false;
-  }
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
-  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host);
-}
 
 export function getApiBase() {
   try {
@@ -48,11 +38,13 @@ export function setApiBase(base) {
 
 export function apiUrl(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
-  // Desktop window and phone URL are same-origin with the API — do not send
-  // those calls to the production VITE_API_BASE_URL.
-  if (servedFromLocalApi()) return normalized;
   const override = getApiBase();
   if (override) return `${override}${normalized}`;
+  // Always target the configured backend (VITE_API_BASE_URL) when set. The
+  // desktop shell serves this UI from 127.0.0.1 with no API behind it, so
+  // same-origin relative URLs would hit the static server and return 405.
+  // CloudFront, Capacitor/Android, and the Vite dev proxy all resolve through
+  // the same rule. APK users can still override via the login API server field.
   const envBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
   return envBase ? `${envBase}${normalized}` : normalized;
 }
