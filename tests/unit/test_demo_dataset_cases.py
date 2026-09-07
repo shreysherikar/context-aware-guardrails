@@ -4,7 +4,6 @@ from domain.enums import PolicyAction
 from domain.models import GuardrailRequest
 from services.policy_engine.engine import PolicyEngine
 from services.risk_engine.classifier import KeywordMockClassifier
-
 from tools.eval_dataset import load_rows, row_passes
 
 clf = KeywordMockClassifier()

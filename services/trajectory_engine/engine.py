@@ -36,6 +36,7 @@ def trajectory_escalate_enabled() -> bool:
     raw = os.getenv("TRAJECTORY_ESCALATE", "true").strip().lower()
     return raw not in {"0", "false", "no", "off"}
 
+
 _RISK_RANK = {
     RiskLevel.LOW: 0,
     RiskLevel.MEDIUM: 1,

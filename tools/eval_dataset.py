@@ -10,16 +10,13 @@ Usage (from repo root):
 from __future__ import annotations
 
 import csv
-import sys
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from domain.models import GuardrailRequest
 from services.policy_engine.engine import PolicyEngine
 from services.risk_engine.classifier import KeywordMockClassifier
+
+ROOT = Path(__file__).resolve().parents[1]
 
 DATASET = ROOT / "data" / "ambiguous_prompt_dataset.csv"
 
@@ -95,9 +92,7 @@ def main() -> int:
     for needle, kind in CRITICAL_CASES.items():
         matches = [row for row in rows if needle in row["prompt"].lower()]
         for row in matches:
-            _risk, decision = evaluate_prompt(
-                row["prompt"], classifier=classifier, policy=policy
-            )
+            _risk, decision = evaluate_prompt(row["prompt"], classifier=classifier, policy=policy)
             action = decision.action.value
             if kind == "block" and action != "BLOCK":
                 print(f"CRITICAL FAIL: {needle!r} -> {action}")

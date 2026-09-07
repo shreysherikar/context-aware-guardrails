@@ -90,8 +90,8 @@ from services.optical_guardrail.ocr import OCRError  # noqa: E402
 from services.optical_guardrail.validation import ImageValidationError, validate_image  # noqa: E402
 from services.output_guardrail.factory import get_output_guardrail  # noqa: E402
 from services.policy_engine.engine import PolicyEngine  # noqa: E402
-from services.risk_engine.factory import get_classifier  # noqa: E402
 from services.rewrite_verify import verify_rewritten_prompt  # noqa: E402
+from services.risk_engine.factory import get_classifier  # noqa: E402
 from services.sanitization.factory import get_sanitization_engine  # noqa: E402
 from services.sanitization.models import (  # noqa: E402
     SanitizationRequest,

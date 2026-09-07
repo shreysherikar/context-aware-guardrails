@@ -167,6 +167,7 @@ def build_issues(
     for category in risk.categories:
         if category == RiskCategory.NONE:
             continue
+        meta: tuple[str, str, str, str] | None
         if category == RiskCategory.CYBER_SAFETY:
             meta = _cyber_safety_issue(risk)
         else:

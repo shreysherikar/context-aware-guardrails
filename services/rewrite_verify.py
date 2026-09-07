@@ -49,9 +49,7 @@ def verify_rewritten_prompt(
             follow_up_risk=empty_risk,
         )
 
-    risk = classifier.classify(
-        GuardrailRequest(prompt=text, conversation_id="rewrite-verify")
-    )
+    risk = classifier.classify(GuardrailRequest(prompt=text, conversation_id="rewrite-verify"))
     decision = policy_engine.evaluate(risk, role)
     leftover_attack = any(
         category.value
