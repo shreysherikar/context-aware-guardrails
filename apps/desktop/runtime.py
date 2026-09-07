@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 import time
 import urllib.error
@@ -14,18 +15,19 @@ from apps.desktop.paths import (
     bundle_root,
     ensure_user_data_dir,
     executable_dir,
+    persist_jwt_secret,
 )
+from services.auth.password import DEFAULT_DESKTOP_USERS
 
 DEFAULT_PORT = 18765
 HEALTH_TIMEOUT_SECONDS = 30.0
 
 
 def configure_desktop_environment() -> Path:
-    """Point at bundled assets and a writable user-data directory.
+    """Point the API at bundled assets and writable user-data databases.
 
-    Must run before the desktop server starts. Sets up desktop-local user
-    data and loads nearby `.env` files. No longer configures the removed
-    local FastAPI backend.
+    Must run before `apps.api.main` is imported. Login is always enabled in
+    the desktop build (`AUTH_DEV_MODE=true`) with local email/password accounts.
     """
     data_dir = ensure_user_data_dir()
     root = bundle_root()
@@ -35,7 +37,50 @@ def configure_desktop_environment() -> Path:
     if exe_dir != root:
         load_dotenv(root / ".env", override=False)
 
+    os.environ["AUTH_DEV_MODE"] = "true"
+    if not os.getenv("AUTH_JWT_SECRET", "").strip():
+        os.environ["AUTH_JWT_SECRET"] = persist_jwt_secret(data_dir / "jwt_secret")
+    if not os.getenv("AUTH_PASSWORD_USERS", "").strip():
+        os.environ["AUTH_PASSWORD_USERS"] = DEFAULT_DESKTOP_USERS
+
+    os.environ.setdefault("POLICY_PATH", str(root / "policies" / "policy.yaml"))
+    os.environ.setdefault("EVIDENCE_CORPUS_PATH", str(root / "evidence" / "approved_sources.yaml"))
+    os.environ["AUDIT_DB_PATH"] = str(data_dir / "audit.db")
+    os.environ["GOVERNANCE_AUDIT_DB_PATH"] = str(data_dir / "governance_audit.db")
+    os.environ["GUARDRAIL_REVIEW_DB_PATH"] = str(data_dir / "guardrail_review.db")
+    os.environ.setdefault("LLM_PROVIDER", "mock")
+    os.environ.setdefault("OPTICAL_OCR_PROVIDER", "mock")
+    _set_if_blank("LLM_GENERATION_PROVIDER", "ollama")
+    _set_if_blank("OLLAMA_MODEL", "llama3.2:3b")
+    _set_if_blank("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    _set_if_blank("OLLAMA_TIMEOUT", "600")
+    os.environ["SERVE_STATIC_FRONTEND"] = "true"
+
+    desktop_origins = [
+        "https://localhost",
+        "http://localhost",
+        "capacitor://localhost",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:18765",
+    ]
+    existing = [
+        origin.strip()
+        for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+        if origin.strip() and origin.strip() != "*"
+    ]
+    merged: list[str] = []
+    for origin in existing + desktop_origins:
+        if origin not in merged:
+            merged.append(origin)
+    os.environ["ALLOWED_ORIGINS"] = ",".join(merged)
+
     return data_dir
+
+
+def _set_if_blank(name: str, value: str) -> None:
+    if not os.getenv(name, "").strip():
+        os.environ[name] = value
 
 
 def pick_port(preferred: int = DEFAULT_PORT, host: str = "0.0.0.0") -> int:
