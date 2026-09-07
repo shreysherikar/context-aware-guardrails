@@ -57,9 +57,7 @@ def _run_server(port: int) -> None:
                 Route("/health", _health),
             ],
         )
-        app.mount(
-            "/", StaticFiles(directory=str(static_dir), html=True), name="static"
-        )
+        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
 
         config = uvicorn.Config(
             app,
