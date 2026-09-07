@@ -91,13 +91,17 @@ from services.optical_guardrail.validation import ImageValidationError, validate
 from services.output_guardrail.factory import get_output_guardrail  # noqa: E402
 from services.policy_engine.engine import PolicyEngine  # noqa: E402
 from services.risk_engine.factory import get_classifier  # noqa: E402
+from services.rewrite_verify import verify_rewritten_prompt  # noqa: E402
 from services.sanitization.factory import get_sanitization_engine  # noqa: E402
 from services.sanitization.models import (  # noqa: E402
     SanitizationRequest,
     SanitizationResult,
     SourceType,
 )
-from services.trajectory_engine.engine import evaluate_conversation  # noqa: E402
+from services.trajectory_engine.engine import (  # noqa: E402
+    evaluate_conversation,
+    trajectory_escalate_enabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +144,12 @@ app.include_router(governance_router)
 # sanitization — never for BLOCK/REVIEW, and never as a decision-maker.
 classifier = get_classifier()
 policy_engine = PolicyEngine()
+if os.getenv("LLM_PROVIDER", "mock").strip().lower() == "groq":
+    logger.warning(
+        "LLM_PROVIDER=groq is flaky for live demos. Set LLM_PROVIDER=mock so "
+        "policy decisions stay deterministic; keep LLM_GENERATION_PROVIDER=groq "
+        "for ALLOW answers only."
+    )
 gateway = get_gateway()
 output_guardrail = get_output_guardrail()
 claim_verifier = get_claim_verifier()
@@ -424,7 +434,7 @@ def issue_dev_token(body: DevTokenRequest) -> dict[str, str]:
     if not auth.is_dev_mode_enabled():
         raise HTTPException(status_code=404, detail="Not Found")
     try:
-        return {"token": auth.mint_dev_token(body.role)}
+        return {"token": auth.mint_dev_token(body.role), "role": body.role}
     except auth.AuthConfigError as exc:
         logger.error("Dev-token issuance misconfigured: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -604,12 +614,17 @@ def health():
 @app.get("/demo/config")
 def demo_config():
     """Expose active provider wiring for the interactive demo."""
+    ocr = os.getenv("OPTICAL_OCR_PROVIDER", "mock")
+    ollama_base = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     return {
         "llm_provider": os.getenv("LLM_PROVIDER", "mock"),
         "generation_provider": resolved_generation_provider(),
-        "ocr_provider": os.getenv("OPTICAL_OCR_PROVIDER", "mock"),
+        "ocr_provider": ocr,
+        "ocr_demo_ready": ocr.strip().lower() in {"mock", "demo"},
         "ollama_model": os.getenv("OLLAMA_MODEL", "qwen3.6:latest"),
-        "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+        "ollama_base_url": ollama_base,
+        "auth_dev_mode": auth.is_dev_mode_enabled(),
+        "trajectory_escalate": trajectory_escalate_enabled(),
     }
 
 
@@ -995,6 +1010,34 @@ async def evaluate(
         extra["sanitization_applied"] = True
         extra["sanitized"] = True
         extra["sanitized_text"] = prompt_for_llm
+        verification = verify_rewritten_prompt(
+            prompt_for_llm,
+            classifier=classifier,
+            policy_engine=policy_engine,
+            role=verified_role,
+        )
+        extra["rewrite_verified"] = verification.verified
+        extra["rewrite_rationale"] = verification.rationale
+        if not verification.verified:
+            review_decision = decision.model_copy(
+                update={
+                    "action": PolicyAction.REVIEW,
+                    "policy_id": verification.follow_up_policy_id,
+                    "reasons": [*decision.reasons, verification.rationale],
+                }
+            )
+            return _fail_closed_review_response(
+                request_id=request_id,
+                decision=review_decision,
+                risk=verification.follow_up_risk,
+                conversation_id=request.conversation_id,
+                user_role=verified_role,
+                audit_prompt=_TEXT_SANITIZED_AUDIT_PROMPT,
+                original_prompt=request.prompt,
+                input_type="text",
+                sanitization=sanitization_meta,
+                extra=extra,
+            )
     else:
         prompt_for_llm = request.prompt
 
@@ -1187,6 +1230,35 @@ async def evaluate_image(
         extra["sanitization_applied"] = True
         extra["sanitized"] = True
         extra["sanitized_text"] = prompt_for_llm
+        verification = verify_rewritten_prompt(
+            prompt_for_llm,
+            classifier=classifier,
+            policy_engine=policy_engine,
+            role=verified_role,
+        )
+        extra["rewrite_verified"] = verification.verified
+        extra["rewrite_rationale"] = verification.rationale
+        if not verification.verified:
+            review_decision = decision.model_copy(
+                update={
+                    "action": PolicyAction.REVIEW,
+                    "policy_id": verification.follow_up_policy_id,
+                    "reasons": [*decision.reasons, verification.rationale],
+                }
+            )
+            return _fail_closed_review_response(
+                request_id=request_id,
+                decision=review_decision,
+                risk=verification.follow_up_risk,
+                conversation_id=conversation_id,
+                user_role=verified_role,
+                audit_prompt="[image input; sanitized]",
+                original_prompt=optical.ocr_text,
+                input_type="image",
+                optical=optical_meta,
+                sanitization=sanitization_meta,
+                extra=extra,
+            )
     else:
         # ALLOW: OCR text is already low-risk; do not sanitize unnecessarily.
         prompt_for_llm = optical.ocr_text

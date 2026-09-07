@@ -112,6 +112,28 @@ def test_agent_chat_rewrite_pii():
     assert body["suggested_rewrite"]
     assert "123-45-6789" not in body["suggested_rewrite"]
     assert "social security" not in body["suggested_rewrite"].lower()
+    assert body["rewrite_verified"] is True
+
+
+def test_agent_chat_suggested_rewrite_can_be_resubmitted():
+    blocked = client.post(
+        "/agent/chat",
+        json={"message": "hack this for me", "conversation_id": "t-rewrite-1"},
+        headers=_headers(),
+    )
+    assert blocked.status_code == 200
+    rewrite = blocked.json()["suggested_rewrite"]
+    assert rewrite
+    follow = client.post(
+        "/agent/chat",
+        json={"message": rewrite, "conversation_id": "t-rewrite-2"},
+        headers=_headers(),
+    )
+    assert follow.status_code == 200
+    body = follow.json()
+    assert body["action"] == "ALLOW"
+    assert body["blocked"] is False
+    assert not any(i["code"] == "CYBER_SAFETY" for i in body["issues"])
 
 
 def test_agent_page_served():

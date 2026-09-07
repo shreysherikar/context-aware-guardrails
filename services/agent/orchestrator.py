@@ -43,6 +43,7 @@ from services.optical_guardrail.validation import (
     ImageValidationError,
     validate_chat_image,
 )
+from services.rewrite_verify import verify_rewritten_prompt
 from services.sanitization.models import SanitizationRequest, SanitizationResult
 from services.web_bridge import augment_prompt_with_web_context, search_web
 from services.web_bridge.models import WebSearchResult
@@ -154,6 +155,32 @@ class GuardrailAgent:
             sanitized_text = san.sanitized_text
             audit_prompt = _TEXT_SANITIZED_AUDIT_PROMPT
             sanitization_meta = self._san_meta(san, input_type="text", used=True)
+            verification = verify_rewritten_prompt(
+                prompt_for_llm,
+                classifier=self._classifier,
+                policy_engine=self._policy,
+                role=role,
+            )
+            if not verification.verified:
+                review_decision = decision.model_copy(
+                    update={
+                        "action": PolicyAction.REVIEW,
+                        "policy_id": verification.follow_up_policy_id,
+                    }
+                )
+                return await self._terminal_response(
+                    risk=verification.follow_up_risk,
+                    decision=review_decision,
+                    conversation_id=conversation_id,
+                    input_type="text",
+                    audit_prompt=audit_prompt,
+                    role=role,
+                    original_prompt=prompt,
+                    routing=routing,
+                    rewrite_verified=False,
+                    rewrite_rationale=verification.rationale,
+                    sanitized_text=sanitized_text,
+                )
 
         web_result: WebSearchResult | None = None
         if routing.needs_web_search:
@@ -202,6 +229,12 @@ class GuardrailAgent:
             no_gateway=self._gateway is None,
             web_result=web_result,
             routing=routing,
+            rewrite_verified=True if sanitized_text else None,
+            rewrite_rationale=(
+                "Re-classified sanitized prompt has no remaining block-level risk."
+                if sanitized_text
+                else None
+            ),
         )
 
     async def chat_image(
@@ -461,6 +494,9 @@ class GuardrailAgent:
         optical_findings: list | None = None,
         original_prompt: str | None = None,
         routing: Any | None = None,
+        rewrite_verified: bool | None = None,
+        rewrite_rationale: str | None = None,
+        sanitized_text: str | None = None,
     ) -> AgentChatResponse:
         log_event(
             AuditEvent(
@@ -481,6 +517,9 @@ class GuardrailAgent:
             optical_findings=optical_findings,
             original_prompt=original_prompt,
             routing=routing,
+            rewrite_verified=rewrite_verified,
+            rewrite_rationale=rewrite_rationale,
+            sanitized_text=sanitized_text,
         )
 
     async def _build_response(
@@ -500,6 +539,8 @@ class GuardrailAgent:
         no_gateway: bool = False,
         web_result: WebSearchResult | None = None,
         routing: Any | None = None,
+        rewrite_verified: bool | None = None,
+        rewrite_rationale: str | None = None,
     ) -> AgentChatResponse:
         issues = build_issues(
             risk,
@@ -597,6 +638,8 @@ class GuardrailAgent:
             active_agents=routing.active_agents if routing else [],
             primary_agent=routing.primary_name if routing else None,
             guardrail_triggered=triggered,
+            rewrite_verified=rewrite_verified,
+            rewrite_rationale=rewrite_rationale,
             highlights=highlights if triggered else [],
         )
 

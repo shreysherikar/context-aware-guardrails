@@ -49,6 +49,8 @@ def dummy_login_enabled() -> bool:
 def _parse_users() -> dict[str, tuple[str, str]]:
     """email -> (password, role). Last duplicate email wins."""
     raw = os.getenv(PASSWORD_USERS_ENV_VAR, "")
+    if not raw.strip() and dummy_login_enabled():
+        raw = DEFAULT_DESKTOP_USERS
     users: dict[str, tuple[str, str]] = {}
     for chunk in raw.split(","):
         entry = chunk.strip()

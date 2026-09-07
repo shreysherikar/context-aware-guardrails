@@ -83,6 +83,8 @@ def test_text_rewrite_sanitizer_then_llm_never_sees_original(monkeypatch):
     assert body["action"] == "REWRITE"
     assert body["sanitization_applied"] is True
     assert body["sanitized"] is True
+    assert body["rewrite_verified"] is True
+    assert body["rewrite_rationale"]
     assert body["input_type"] == "text"
     assert len(gateway.calls) == 1
     llm_prompt = gateway.calls[0]
@@ -112,6 +114,7 @@ def test_image_rewrite_sanitizer_then_llm_never_sees_original_ocr(monkeypatch):
     body = resp.json()
     assert body["action"] == "REWRITE"
     assert body["sanitization_applied"] is True
+    assert body["rewrite_verified"] is True
     assert len(gateway.calls) == 1
     assert "John Smith" not in gateway.calls[0]
     assert "123456" not in gateway.calls[0]

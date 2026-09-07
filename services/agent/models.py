@@ -66,4 +66,6 @@ class AgentChatResponse(BaseModel):
     active_agents: list[AgentActivation] = Field(default_factory=list)
     primary_agent: str | None = None
     guardrail_triggered: bool = False
+    rewrite_verified: bool | None = None
+    rewrite_rationale: str | None = None
     highlights: list[PromptHighlight] = Field(default_factory=list)
