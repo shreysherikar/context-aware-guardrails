@@ -44,9 +44,7 @@ ADVBENCH_URL = (
     "https://raw.githubusercontent.com/llm-attacks/llm-attacks/main/"
     "data/advbench/harmful_behaviors.csv"
 )
-ALPACA_URL = (
-    "https://raw.githubusercontent.com/tatsu-lab/stanford_alpaca/main/alpaca_data.json"
-)
+ALPACA_URL = "https://raw.githubusercontent.com/tatsu-lab/stanford_alpaca/main/alpaca_data.json"
 DOLLY_URL = (
     "https://huggingface.co/datasets/databricks/databricks-dolly-15k/resolve/main/"
     "databricks-dolly-15k.jsonl"
@@ -57,9 +55,7 @@ _CYBER_RE = re.compile(
     r"ddos|botnet|spyware|backdoor|sql injection|xss|payload|crack password|"
     r"steal (password|credential|data)|exfiltrat|webshell|rootkit)\b"
 )
-_SKIP_RE = re.compile(
-    r"(?i)\b(child|minor|csam|pornograph|sexual content|suicide|bomb making)\b"
-)
+_SKIP_RE = re.compile(r"(?i)\b(child|minor|csam|pornograph|sexual content|suicide|bomb making)\b")
 _EDU_RE = re.compile(
     r"(?i)\b(what is|overview of|how (do we|to) detect|awareness training|"
     r"owasp|report a (security|suspicious)|password manager|set up mfa)\b"

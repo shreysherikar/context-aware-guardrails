@@ -17,9 +17,7 @@ from pathlib import Path
 
 from domain.enums import RiskCategory
 
-_DATASET_PATH = (
-    Path(__file__).resolve().parents[2] / "data" / "offensive_cyber_prompts.csv"
-)
+_DATASET_PATH = Path(__file__).resolve().parents[2] / "data" / "offensive_cyber_prompts.csv"
 
 _CATEGORY_BY_NAME = {
     "MALWARE": RiskCategory.MALWARE,
@@ -168,9 +166,7 @@ _INJECTION: list[str] = [
     r"\bdisable (?:the )?(?:safety|security|guardrail)s?\b",
 ]
 
-_SAFE_HACK_CONTEXT = re.compile(
-    r"(?i)\b(hackathon|life[- ]hack|hack together|hacky|hacker news)\b"
-)
+_SAFE_HACK_CONTEXT = re.compile(r"(?i)\b(hackathon|life[- ]hack|hack together|hacky|hacker news)\b")
 
 _EXPLICIT_HACK = re.compile(
     r"(?i)\b(hack this|hack that|hack it|hack into|hack the|please hack|help me hack)\b"
